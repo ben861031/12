@@ -1,0 +1,8 @@
+// 在既有 Firestore Rules 中找到 universalResponses，整段替換為以下內容：
+match /universalResponses/{document} {
+  // 前台可以新增填寫結果
+  allow create: if request.resource.data.formId is string;
+
+  // 僅最高管理員可以查看、修正及刪除
+  allow read, update, delete: if surveySystemAdmin();
+}

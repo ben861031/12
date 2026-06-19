@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>公司通用問卷調查系統 v1.5</title>
+  <title>公司通用問卷調查系統 v1.6</title>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="css/app.css?v=1.5">
-  <link rel="stylesheet" href="css/v1.2.css?v=1.5">
-  <link rel="stylesheet" href="css/v1.4.css?v=1.5">
+  <link rel="stylesheet" href="css/app.css?v=1.6">
+  <link rel="stylesheet" href="css/v1.2.css?v=1.6">
+  <link rel="stylesheet" href="css/v1.4.css?v=1.6">
+  <link rel="stylesheet" href="css/v1.6.css?v=1.6">
 </head>
 <body>
   <div id="toast" class="toast"></div>
@@ -54,11 +55,18 @@
       </section>
 
       <section id="resultsPanel" class="panel">
-        <div class="card"><div class="sectionHead"><div><h2>填寫結果</h2><p id="resultCaption">請先選擇問卷。</p></div><div class="buttonRow"><button class="btn" onclick="copyFormLink()">複製問卷網址</button><button class="btn success" onclick="exportResults()">Excel 匯出</button></div></div><div id="resultsTable"></div></div>
+        <div class="card"><div class="sectionHead"><div><h2>填寫結果</h2><p id="resultCaption">請先選擇問卷。</p></div><div class="buttonRow"><button class="btn" onclick="copyFormLink()">複製問卷網址</button><button class="btn success" onclick="exportResults()">Excel 匯出</button></div></div><div id="resultAnalysis"></div><div class="resultDetailHead"><h3>逐筆填寫明細</h3><p>管理員可修正或刪除個別回覆。</p></div><div id="resultsTable"></div></div>
       </section>
     </main>
   </div>
-  <script src="js/config.js?v=1.5"></script>
-  <script src="js/app.js?v=1.5"></script>
+
+  <div id="responseEditMask" class="modalMask">
+    <div class="responseEditCard">
+      <div class="sectionHead"><div><h2>編輯填寫結果</h2><p id="responseEditCaption"></p></div><button class="btn" type="button" onclick="closeResponseEditor()">關閉</button></div>
+      <form id="responseEditForm" onsubmit="saveEditedResponse(event)"><div id="responseEditBody"></div><div class="buttonRow modalActions"><button id="saveResponseBtn" class="btn primary" type="submit">儲存變更</button><button class="btn" type="button" onclick="closeResponseEditor()">取消</button></div></form>
+    </div>
+  </div>
+  <script src="js/config.js?v=1.6"></script>
+  <script src="js/app.js?v=1.6"></script>
 </body>
 </html>
