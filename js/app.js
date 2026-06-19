@@ -13,7 +13,7 @@ function imageUrl(value){let v=String(value||'').trim();if(!v)return '';if(/^ass
 function formRouteId(){let m=location.hash.match(/^#form\/([^/?#]+)/);return m?decodeURIComponent(m[1]):''}
 
 async function init(){
-  if(!window.firebase||!window.firebaseConfig?.apiKey){frontMain.innerHTML='<div class="successCard"><h2>尚未設定 Firebase</h2></div>';return}
+  if(!window.firebase||typeof firebaseConfig==='undefined'||!firebaseConfig.apiKey){frontMain.innerHTML='<div class="successCard"><h2>尚未設定 Firebase</h2><p>請確認 js/config.js 已正確上傳。</p></div>';return}
   app=firebase.initializeApp(firebaseConfig);auth=firebase.auth();db=firebase.firestore();
   window.addEventListener('hashchange',applyRoute);
   auth.onAuthStateChanged(async user=>{currentUser=user;isAdmin=false;if(user){try{isAdmin=await checkAdmin(user)}catch(e){console.error(e)}if(isAdmin){adminUser.textContent=user.email||'';loginMask.style.display='none';await loadAdminData()}}applyRoute()});
@@ -28,7 +28,7 @@ async function loadResponses(){if(!isAdmin||!activeFormId){responses=[];return}t
 function applyRoute(){let wantsAdmin=location.hash==='#admin';if(wantsAdmin&&isAdmin){front.style.display='none';admin.style.display='block';loginMask.style.display='none';renderAdmin();return}admin.style.display='none';front.style.display='block';if(wantsAdmin&&!isAdmin)loginMask.style.display='grid';else loginMask.style.display='none';renderFront()}
 function openAdmin(){history.pushState(null,'','#admin');applyRoute()}
 function closeLogin(){loginMask.style.display='none';history.replaceState(null,'','#form/'+encodeURIComponent(activeFormId||''));applyRoute()}
-async function loginGoogle(){loginBtn.disabled=true;loginBtn.textContent='登入處理中…';loginMsg.textContent='';try{let p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});await auth.signInWithPopup(p);if(!isAdmin)loginMsg.textContent='正在確認管理員權限…'}catch(e){loginMsg.textContent=e.code==='auth/popup-closed-by-user'?'已取消登入。':(e.message||'登入失敗')}finally{loginBtn.disabled=false;loginBtn.textContent='使用 Google 登入'}}
+async function loginGoogle(){if(!auth){loginMsg.textContent='登入服務尚未完成初始化，請重新整理頁面後再試一次。';return}loginBtn.disabled=true;loginBtn.textContent='登入處理中…';loginMsg.textContent='';try{let p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:'select_account'});await auth.signInWithPopup(p);if(!isAdmin)loginMsg.textContent='正在確認管理員權限…'}catch(e){loginMsg.textContent=e.code==='auth/popup-closed-by-user'?'已取消登入。':(e.message||'登入失敗')}finally{loginBtn.disabled=false;loginBtn.textContent='使用 Google 登入'}}
 async function logout(){await auth.signOut();history.replaceState(null,'','#form/'+encodeURIComponent(activeFormId||''));applyRoute()}
 function showFront(){history.pushState(null,'','#form/'+encodeURIComponent(activeFormId||''));applyRoute()}
 

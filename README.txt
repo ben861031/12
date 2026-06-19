@@ -1,4 +1,9 @@
-公司通用問卷調查系統 v1.0（基礎版）
+公司通用問卷調查系統 v1.1（Firebase 初始化修正版）
+
+本版修正：
+- 修正 config.js 已存在卻被誤判為「尚未設定 Firebase」。
+- 修正 Firebase 尚未初始化時點擊登入造成 signInWithPopup 錯誤。
+- 更新 CSS、config.js 與 app.js 快取版本，避免 GitHub Pages 沿用舊檔。
 
 用途：
 - 取代一般 Google 表單，建立公司內部各類問卷。
