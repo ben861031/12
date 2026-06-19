@@ -1,0 +1,36 @@
+公司通用問卷調查系統 v1.0（基礎版）
+
+用途：
+- 取代一般 Google 表單，建立公司內部各類問卷。
+- 與行政部活動調查系統完全分開。
+- Firebase 集合使用 universalForms、universalResponses。
+
+目前功能：
+- 建立、編輯、刪除多份問卷。
+- 每份問卷具備獨立前台網址。
+- 題型：簡答、長文、單選、複選、下拉選單、部門選單、圖片／說明。
+- 設定必填、截止時間、草稿／開放／關閉狀態。
+- 題目上移、下移及刪除。
+- 公開前台填寫與 Firebase 儲存。
+- 後台查看結果與 Excel 匯出。
+- 一鍵建立「立領撞色外套尺寸調查」範本。
+
+檔案結構：
+- index.html：前台與後台頁面結構
+- css/app.css：介面樣式
+- js/config.js：Firebase 設定
+- js/app.js：問卷建立器、填寫與結果功能
+- assets/company-logo.png：公司識別
+- assets/uniform-survey-reference.jpg：原 Google 問卷參考截圖
+- Firestore規則新增區塊.txt：需要合併到共用 Rules 的新集合規則
+
+部署順序：
+1. 請建立新的 GitHub Pages 儲存庫或獨立資料夾，不要覆蓋聚餐系統。
+2. 上傳本資料夾中的 index.html、css、js、assets。
+3. 將「Firestore規則新增區塊.txt」中的兩個 match 區塊加入現有 Rules，放在最後拒絕規則之前。
+4. 以管理員 Google 帳號登入後台。
+5. 按「建立外套尺寸範本」，補上截止時間並將狀態改為「開放填寫」。
+6. 取得外套與尺寸表原始圖片後，可上傳至可公開讀取的位置，再將網址填入題目的「參考圖片網址」。
+
+後台網址：index.html#admin
+前台網址：由後台「複製前台網址」取得，格式為 index.html#form/問卷ID
