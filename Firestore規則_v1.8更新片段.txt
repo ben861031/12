@@ -1,0 +1,16 @@
+// 在既有 Firestore Rules 中找到 universalResponses，整段替換為以下內容：
+match /universalResponses/{document} {
+  // 使用公司人員資料時，文件 ID 必須是「問卷ID__人員ID」，確保每人每份問卷只有一筆。
+  // 不收集人員身分的匿名問卷仍可重複提交。
+  allow create: if request.resource.data.formId is string &&
+    (
+      !('memberId' in request.resource.data) ||
+      (
+        request.resource.data.memberId is string &&
+        document == request.resource.data.formId + '__' + request.resource.data.memberId
+      )
+    );
+
+  // 僅最高管理員可以查看、修正及刪除。
+  allow read, update, delete: if surveySystemAdmin();
+}
