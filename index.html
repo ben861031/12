@@ -1,0 +1,33 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>體適能畢業門檻查詢系統</title>
+ 
+  <!-- Tailwind CSS & SheetJS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- Firebase SDKs (CDN) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- 企業級行政管理系統樣式表 -->
+  <link rel="stylesheet" href="css/custom.css">
+</head>
+<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen antialiased text-sm">
+
+  <!-- SPA 單頁應用程式獨立動態掛載點 (Sinotech 企業級單頁架構) -->
+  <div id="root"></div>
+
+  <!-- 系統核心邏輯與組件庫 -->
+  <script src="js/firebase-config.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/excel-importer.js"></script>
+  <script src="js/ui-templates.js"></script>
+  <script src="js/student-portal.js"></script>
+  <script src="js/admin-portal.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
