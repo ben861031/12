@@ -25,30 +25,34 @@
     const studentSec = document.getElementById('studentPortalSection');
     const announcementsSec = document.getElementById('announcementsPortalSection');
     const adminSec = document.getElementById('adminPortalSection');
-    const navStudent = document.getElementById('navStudentTab');
-    const navAdmin = document.getElementById('navAdminTab');
+    const navStudLink = document.getElementById('navStudentLink');
+    const navStudLine = document.getElementById('navStudentLine');
+    const navAnnLink = document.getElementById('navAnnouncementsLink');
+    const navAnnLine = document.getElementById('navAnnouncementsLine');
+    if (navStudLink) { navStudLink.classList.remove('text-red-600'); navStudLink.classList.add('text-slate-700', 'hover:text-red-600'); }
+    if (navStudLine) { navStudLine.classList.remove('w-full'); navStudLine.classList.add('w-0'); }
+    if (navAnnLink) { navAnnLink.classList.remove('text-red-600'); navAnnLink.classList.add('text-slate-700', 'hover:text-red-600'); }
+    if (navAnnLine) { navAnnLine.classList.remove('w-full'); navAnnLine.classList.add('w-0'); }
     if (tab === 'student') {
+      if (navStudLink) { navStudLink.classList.remove('text-slate-700'); navStudLink.classList.add('text-red-600', 'hover:text-red-600'); }
+      if (navStudLine) { navStudLine.classList.remove('w-0'); navStudLine.classList.add('w-full'); }
       if (mainHeader) mainHeader.classList.remove('hidden');
       if (studentSec) studentSec.classList.remove('hidden');
       if (announcementsSec) announcementsSec.classList.add('hidden');
       if (adminSec) adminSec.classList.add('hidden');
-      if (navStudent) navStudent.className = 'corp-segment-btn active';
-      if (navAdmin) navAdmin.className = 'corp-segment-btn';
     } else if (tab === 'announcements') {
+      if (navAnnLink) { navAnnLink.classList.remove('text-slate-700'); navAnnLink.classList.add('text-red-600', 'hover:text-red-600'); }
+      if (navAnnLine) { navAnnLine.classList.remove('w-0'); navAnnLine.classList.add('w-full'); }
       if (mainHeader) mainHeader.classList.remove('hidden');
       if (studentSec) studentSec.classList.add('hidden');
       if (announcementsSec) announcementsSec.classList.remove('hidden');
       if (adminSec) adminSec.classList.add('hidden');
-      if (navStudent) navStudent.className = 'corp-segment-btn';
-      if (navAdmin) navAdmin.className = 'corp-segment-btn';
       if (window.StudentPortal) window.StudentPortal.renderAnnouncementsPage();
     } else {
       if (mainHeader) mainHeader.classList.add('hidden');
       if (studentSec) studentSec.classList.add('hidden');
       if (announcementsSec) announcementsSec.classList.add('hidden');
       if (adminSec) adminSec.classList.remove('hidden');
-      if (navStudent) navStudent.className = 'corp-segment-btn';
-      if (navAdmin) navAdmin.className = 'corp-segment-btn active';
       window.AdminPortal.checkAuthAndRender();
     }
   },

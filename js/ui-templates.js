@@ -3,20 +3,26 @@
   <!-- ==================== 1. \u9802\u6a13\u6975\u81f4\u7cbe\u7c21\u5c0e\u89bd Header (\u9032\u5165\u5f8c\u53f0\u81ea\u52d5\u96b1\u85cf) ==================== -->
   <header id="mainTopHeader" class="bg-white border-b border-slate-200 sticky top-0 z-40 px-4 lg:px-8 py-3.5 shadow-xs">
     <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
-      <!-- \u54c1\u724c Logo \u8207\u7cfb\u7d71\u540d\u7a31 -->
-      <div class="flex items-center gap-2.5 sm:gap-3">
-        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg sm:text-xl shadow-sm shrink-0">
-          <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+      <!-- \u54c1\u724c Logo \u8207\u7cfb\u7d71\u540d\u7a31 (\u5de6\u908a\u5340\u584a flex-1 \u9760\u5de6) -->
+      <div class="flex-1 flex items-center justify-start min-w-0">
+        <div class="flex items-center gap-2.5 sm:gap-3 cursor-pointer group" onclick="App.switchTab('student')">
+          <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold text-lg sm:text-xl shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+          </div>
+          <h1 class="text-sm sm:text-lg font-bold text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors whitespace-nowrap overflow-hidden text-ellipsis">
+            \u9ad4\u9069\u80fd\u7562\u696d\u9580\u6abb\u67e5\u8a62\u7cfb\u7d71
+          </h1>
         </div>
-        <h1 class="text-sm sm:text-lg font-bold text-slate-900 tracking-tight">
-          \u9ad4\u9069\u80fd\u7562\u696d\u9580\u6abb\u67e5\u8a62\u7cfb\u7d71
-        </h1>
       </div>
-      <!-- \u4e2d\u592e\u5c0e\u89bd\u9023\u7d50 (\u684c\u6a5f\u7248) -->
-      <nav class="hidden md:flex items-center gap-8 text-[16px] font-bold tracking-wide">
+      <!-- \u4e2d\u592e\u7d71\u4e00\u5c0e\u89bd\u9023\u7d50 (100% \u6578\u5b78\u7cbe\u6e96\u5c0d\u9f4a\u7f6e\u4e2d flex-none) -->
+      <nav class="hidden md:flex items-center justify-center gap-8 text-[16px] font-bold tracking-wide flex-none">
+        <button id="navStudentLink" onclick="App.switchTab('student')" class="text-red-600 hover:text-red-600 transition-colors py-1 relative group flex items-center gap-1.5 cursor-pointer border-0 bg-transparent font-bold">
+          <span>\u7562\u696d\u9580\u6abb\u67e5\u8a62</span>
+          <span id="navStudentLine" class="absolute bottom-0 left-0 w-full h-[2px] bg-red-600 transition-all duration-300 group-hover:w-full"></span>
+        </button>
         <button id="navAnnouncementsLink" onclick="App.switchTab('announcements')" class="text-slate-700 hover:text-red-600 transition-colors py-1 relative group flex items-center gap-1.5 cursor-pointer border-0 bg-transparent font-bold">
           <span>\u6700\u65b0\u516c\u544a</span>
-          <span class="absolute bottom-0 left-0 w-0 h-[2px] bg-red-600 transition-all duration-300 group-hover:w-full"></span>
+          <span id="navAnnouncementsLine" class="absolute bottom-0 left-0 w-0 h-[2px] bg-red-600 transition-all duration-300 group-hover:w-full"></span>
         </button>
         <a href="https://www.just.edu.tw/" target="_blank" class="text-slate-700 hover:text-red-600 transition-colors py-1 relative group">
           \u5b78\u6821\u9996\u9801
@@ -27,17 +33,12 @@
           <span class="absolute bottom-0 left-0 w-0 h-[2px] bg-red-600 transition-all duration-300 group-hover:w-full"></span>
         </a>
       </nav>
-      <!-- \u53f3\u5074\u529f\u80fd\u5340\uff1a\u9801\u7c64\u5207\u63db\u5668\u8207\u624b\u6a5f\u6f22\u5821\u6309\u9215 -->
-      <div class="flex items-center gap-2 sm:gap-3">
-        <!-- \u9801\u7c64\u5207\u63db\u5668 -->
-        <div class="corp-segment-control">
-          <button id="navStudentTab" onclick="App.switchTab('student')" class="corp-segment-btn active text-xs sm:text-sm px-2.5 sm:px-4">
-            \u5b78\u751f\u67e5\u8a62
-          </button>
-          <button id="navAdminTab" onclick="App.switchTab('admin')" class="corp-segment-btn text-xs sm:text-sm px-2.5 sm:px-4">
-            \u7ba1\u7406\u5f8c\u53f0
-          </button>
-        </div>
+      <!-- \u53f3\u5074\u529f\u80fd\u5340 (\u53f3\u908a\u5340\u584a flex-1 \u9760\u53f3) -->
+      <div class="flex-1 flex items-center justify-end gap-2 sm:gap-3">
+        <button onclick="App.switchTab('admin')" class="px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-extrabold bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200/80 transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          <span>\u7ba1\u7406\u5f8c\u53f0</span>
+        </button>
         <!-- \u624b\u6a5f\u9078\u55ae\u958b\u95dc\u6309\u9215 (\u50c5\u624b\u6a5f\u986f\u793a) -->
         <button id="mobileMenuToggleBtn" onclick="App.toggleMobileMenu()" class="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors focus:outline-none border border-slate-200" aria-label="\u9078\u55ae">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -46,12 +47,16 @@
     </div>
     <!-- \u624b\u6a5f\u7248\u5c55\u958b\u9078\u55ae\u62bd\u5c5c (Mobile Menu Drawer) -->
     <div id="mobileMenuDrawer" class="hidden md:hidden border-t border-slate-100 mt-3 pt-3 space-y-1.5 text-sm font-bold">
-      <button onclick="App.switchTab('announcements'); App.toggleMobileMenu();" class="w-full text-left font-bold text-slate-700 hover:text-blue-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 flex items-center justify-between border-0 bg-transparent transition-colors">
+      <button onclick="App.switchTab('student'); App.toggleMobileMenu();" class="w-full text-left font-bold text-slate-700 hover:text-red-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 flex items-center gap-2.5 border-0 bg-transparent transition-colors">
+        <svg class="w-4 h-4 text-slate-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span>\u7562\u696d\u9580\u6abb\u67e5\u8a62</span>
+      </button>
+      <button onclick="App.switchTab('announcements'); App.toggleMobileMenu();" class="w-full text-left font-bold text-slate-700 hover:text-red-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 flex items-center justify-between border-0 bg-transparent transition-colors">
         <span class="flex items-center gap-2.5">
-          <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          <svg class="w-4 h-4 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
           <span>\u6700\u65b0\u516c\u544a</span>
         </span>
-        <span class="text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">\u5c08\u5c6c\u9801\u9762</span>
+        <span class="text-xs text-red-600 font-semibold bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100">\u5c08\u5c6c\u9801\u9762</span>
       </button>
       <a href="https://www.just.edu.tw/" target="_blank" class="flex items-center gap-2.5 font-bold text-slate-700 hover:text-blue-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 transition-colors">
         <svg class="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -68,7 +73,7 @@
     </div>
   </header>
   <!-- ==================== 2. \u5b78\u751f\u81ea\u670d\u52d9\u67e5\u8a62 Portal (STUDENT PORTAL) ==================== -->
-  <main id="studentPortalSection" class="flex-1 max-w-4xl w-full mx-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+  <main id="studentPortalSection" class="flex-1 max-w-5xl w-full mx-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
     <!-- \u641c\u5c0b\u5361\u7247 -->
     <div class="bg-white rounded-lg border border-slate-200 shadow-sm p-6 sm:p-8">
       <!-- \u6a19\u982d\u5340 -->
