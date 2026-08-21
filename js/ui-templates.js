@@ -14,7 +14,7 @@
       </div>
       <!-- \u4e2d\u592e\u5c0e\u89bd\u9023\u7d50 (\u684c\u6a5f\u7248) -->
       <nav class="hidden md:flex items-center gap-8 text-[16px] font-bold tracking-wide">
-        <button onclick="StudentPortal.openAnnouncementsModal()" class="text-slate-700 hover:text-red-600 transition-colors py-1 relative group flex items-center gap-1.5 cursor-pointer border-0 bg-transparent">
+        <button id="navAnnouncementsLink" onclick="App.switchTab('announcements')" class="text-slate-700 hover:text-red-600 transition-colors py-1 relative group flex items-center gap-1.5 cursor-pointer border-0 bg-transparent font-bold">
           <span>\u6700\u65b0\u516c\u544a</span>
           <span class="absolute bottom-0 left-0 w-0 h-[2px] bg-red-600 transition-all duration-300 group-hover:w-full"></span>
         </button>
@@ -46,12 +46,12 @@
     </div>
     <!-- \u624b\u6a5f\u7248\u5c55\u958b\u9078\u55ae\u62bd\u5c5c (Mobile Menu Drawer) -->
     <div id="mobileMenuDrawer" class="hidden md:hidden border-t border-slate-100 mt-3 pt-3 space-y-1.5 text-sm font-bold">
-      <button onclick="StudentPortal.openAnnouncementsModal(); App.toggleMobileMenu();" class="w-full text-left font-bold text-slate-700 hover:text-red-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 flex items-center justify-between border-0 bg-transparent transition-colors">
+      <button onclick="App.switchTab('announcements'); App.toggleMobileMenu();" class="w-full text-left font-bold text-slate-700 hover:text-blue-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 flex items-center justify-between border-0 bg-transparent transition-colors">
         <span class="flex items-center gap-2.5">
-          <svg class="w-4 h-4 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+          <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
           <span>\u6700\u65b0\u516c\u544a</span>
         </span>
-        <span class="text-xs text-red-600 font-semibold bg-red-50 px-2 py-0.5 rounded-full border border-red-100">\u67e5\u770b</span>
+        <span class="text-xs text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">\u5c08\u5c6c\u9801\u9762</span>
       </button>
       <a href="https://www.just.edu.tw/" target="_blank" class="flex items-center gap-2.5 font-bold text-slate-700 hover:text-blue-600 py-2.5 px-3 rounded-xl hover:bg-slate-50 transition-colors">
         <svg class="w-4 h-4 text-slate-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
@@ -62,7 +62,7 @@
         <span>\u5b78\u52d9\u8655\u5b98\u7db2</span>
       </a>
       <a href="https://jbagt.just.edu.tw/rule/rules/A003-114-11-26-yEO.pdf" target="_blank" class="flex items-center gap-2.5 font-bold text-blue-600 hover:text-blue-800 py-2.5 px-3 rounded-xl bg-blue-50/70 border border-blue-200/80 transition-colors">
-        <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 01-2-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <svg class="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
         <span>\u5b78\u751f\u9ad4\u9069\u80fd\u7562\u696d\u689d\u4ef6\u5be6\u65bd\u7d30\u5247 (PDF)</span>
       </a>
     </div>
@@ -115,6 +115,42 @@
     </div>
     <!-- \u67e5\u8a62\u7d50\u679c\u5bb9\u5668 -->
     <div id="studentQueryResult" class="hidden space-y-6 mt-6"></div>
+  </main>
+  <!-- ==================== 2.5. \u5c08\u5c6c\u6700\u65b0\u516c\u544a\u9801\u9762 (ANNOUNCEMENTS PORTAL) ==================== -->
+  <main id="announcementsPortalSection" class="hidden flex-1 max-w-5xl w-full mx-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+    <div class="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-6 sm:p-8 space-y-6">
+      <!-- \u6a19\u984c\u5340\u584a\u8207\u641c\u5c0b\u95dc\u9375\u5b57\u904e\u6ffe\u5217 -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+              \u6700\u65b0\u516c\u544a\u8207\u6ce8\u610f\u4e8b\u9805
+            </h2>
+          </div>
+          <p class="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            \u9ad4\u80b2\u53ca\u6d3b\u52d5\u7d44\u6700\u65b0\u516c\u544a\u3001\u88dc\u6e2c\u6642\u7a0b\u3001\u9ad4\u4fdd/\u8eab\u969c\u6298\u62b5\u8207\u514d\u6e2c\u6ce8\u610f\u4e8b\u9805\u3002
+          </p>
+        </div>
+        <!-- \u95dc\u9375\u5b57\u641c\u5c0b\u6846 -->
+        <div class="relative w-full md:w-72">
+          <input type="text" id="announcementSearchInput" oninput="StudentPortal.handleAnnouncementSearch()" placeholder="\u641c\u5c0b\u516c\u544a\u6a19\u984c\u6216\u5167\u6587..." class="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:border-blue-600 focus:outline-none bg-slate-50 text-slate-900 transition-all">
+          <button type="button" id="announcementSearchClearBtn" onclick="StudentPortal.clearAnnouncementSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-500 transition-all flex items-center justify-center cursor-pointer text-[10px] font-bold z-10">\u2715</button>
+        </div>
+      </div>
+      <!-- \u5206\u985e\u6a19\u7c64\u5feb\u901f\u5207\u63db\u5668 (Category Filter Pills) -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
+        <button onclick="StudentPortal.filterAnnouncementCategory('ALL')" data-ann-cat="ALL" class="ann-cat-pill active px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-2xs transition-all cursor-pointer">\u5168\u90e8\u516c\u544a</button>
+        <button onclick="StudentPortal.filterAnnouncementCategory('\u91cd\u8981\u901a\u77e5')" data-ann-cat="\u91cd\u8981\u901a\u77e5" class="ann-cat-pill px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all cursor-pointer">\u91cd\u8981\u901a\u77e5</button>
+        <button onclick="StudentPortal.filterAnnouncementCategory('\u88dc\u6e2c\u516c\u544a')" data-ann-cat="\u88dc\u6e2c\u516c\u544a" class="ann-cat-pill px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all cursor-pointer">\u88dc\u6e2c\u516c\u544a</button>
+        <button onclick="StudentPortal.filterAnnouncementCategory('\u7533\u8fa6\u63d0\u9192')" data-ann-cat="\u7533\u8fa6\u63d0\u9192" class="ann-cat-pill px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all cursor-pointer">\u7533\u8fa6\u63d0\u9192</button>
+        <button onclick="StudentPortal.filterAnnouncementCategory('\u8ab2\u7a0b\u8cc7\u8a0a')" data-ann-cat="\u8ab2\u7a0b\u8cc7\u8a0a" class="ann-cat-pill px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all cursor-pointer">\u8ab2\u7a0b\u8cc7\u8a0a</button>
+      </div>
+      <!-- \u516c\u544a\u5927\u5c08\u9662\u6821\u5c0d\u9f4a\u8868\u683c (Table List Container) -->
+      <div id="announcementsPageTableContainer"></div>
+    </div>
   </main>
   <!-- ==================== 3. \u7ba1\u7406\u5f8c\u53f0 (ADMIN PORTAL) ==================== -->
   <div id="adminPortalSection" class="hidden flex-1 flex flex-col md:flex-row min-h-[calc(100vh-61px)]">
@@ -1536,10 +1572,14 @@
               <option value="\u8ab2\u7a0b\u8cc7\u8a0a">\u8ab2\u7a0b\u8cc7\u8a0a</option>
             </select>
           </div>
-          <div class="flex items-center pt-6">
+          <div class="flex items-center gap-4 pt-6">
             <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
               <input type="checkbox" id="announcementInputIsPinned" class="w-4 h-4 text-rose-600 rounded border-slate-300">
-              <span>\ud83d\udccc \u7f6e\u9802\u9ad8\u4eae\u986f\u793a</span>
+              <span>\ud83d\udccc \u7f6e\u9802</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700">
+              <input type="checkbox" id="announcementInputIsPublished" checked class="w-4 h-4 text-emerald-600 rounded border-slate-300">
+              <span>\u555f\u7528\u520a\u767b (\u72c0\u614b\u958b\u95dc)</span>
             </label>
           </div>
         </div>

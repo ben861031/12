@@ -15,7 +15,8 @@
     const activeList = allAnnouncements.filter(ann => {
       const start = ann.startDate || '2000-01-01';
       const end = ann.endDate || '2099-12-31';
-      return start <= today && today <= end;
+      const isPublished = ann.isPublished !== false;
+      return isPublished && start <= today && today <= end;
     });
     activeList.sort((a, b) => {
       if (a.isPinned && !b.isPinned) return -1;
@@ -33,24 +34,72 @@
           '\u7533\u8fa6\u63d0\u9192': 'bg-amber-100 text-amber-800 border-amber-200',
           '\u8ab2\u7a0b\u8cc7\u8a0a': 'bg-emerald-100 text-emerald-800 border-emerald-200'
         };
-        modalBody.innerHTML = activeList.map(ann => {
+        const rowsHTML = activeList.map(ann => {
           const badgeClass = badgeColors[ann.category] || 'bg-blue-100 text-blue-800 border-blue-200';
+          const isPinnedCard = ann.isPinned;
           return `
-            <div class="p-4 rounded-xl border border-slate-200 ${ann.isPinned ? 'bg-amber-50/40 border-amber-200/80' : 'bg-slate-50/70'} transition-all shadow-2xs">
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                <div class="flex items-center gap-2 flex-wrap">
-                  ${ann.isPinned ? `<span class="bg-rose-600 text-white text-[11px] font-black px-2 py-0.5 rounded shadow-2xs">\ud83d\udccc \u7f6e\u9802</span>` : ''}
-                  <span class="text-xs font-bold px-2.5 py-0.5 rounded-md border ${badgeClass}">${ann.category || '\u91cd\u8981\u901a\u77e5'}</span>
-                  <h4 class="text-sm font-bold text-slate-900">${ann.title}</h4>
-                </div>
-                <span class="text-xs font-mono text-slate-500 shrink-0 font-medium">
-                  ${ann.startDate} ~ ${ann.endDate}
+            <tr class="hover:bg-blue-50/50 transition-colors cursor-pointer ${isPinnedCard ? 'bg-amber-50/40 font-bold' : ''}" onclick="StudentPortal.toggleAnnouncementDetail('${ann.id}')">
+              <td class="py-3.5 px-4 font-mono text-xs text-slate-600 font-semibold whitespace-nowrap align-top">
+                ${ann.startDate || ann.createdAt?.slice(0, 10) || ''}
+              </td>
+              <td class="py-3.5 px-3 text-center whitespace-nowrap align-top">
+                <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-md border ${badgeClass}">
+                  ${ann.category || '\u91cd\u8981\u901a\u77e5'}
                 </span>
-              </div>
-              ${ann.content ? `<p class="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium mt-1.5 whitespace-pre-line pl-2.5 border-l-2 border-slate-300">${ann.content}</p>` : ''}
-            </div>
+              </td>
+              <td class="py-3.5 px-4 text-slate-900 font-bold text-sm leading-relaxed align-top">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  ${isPinnedCard ? `<span class="bg-rose-100 text-rose-800 border border-rose-200 text-[11px] font-black px-1.5 py-0.5 rounded shrink-0">\ud83d\udccc \u7f6e\u9802</span>` : ''}
+                  <span>${ann.title}</span>
+                </div>
+              </td>
+              <td class="py-3.5 px-3 text-center font-bold text-xs text-blue-600 hover:text-blue-800 whitespace-nowrap align-top">
+                <span id="annBtn_${ann.id}">\u89c0\u770b \u25be</span>
+              </td>
+            </tr>
+            <tr id="annDetail_${ann.id}" class="hidden bg-slate-50/90 border-b border-slate-200">
+              <td colspan="4" class="p-4 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-line border-t border-slate-200">
+                <div class="font-bold text-slate-900 mb-1.5 flex items-center justify-between flex-wrap gap-2">
+                  <span class="text-blue-900">\ud83d\udccc \u516c\u544a\u8a73\u7d30\u8aaa\u660e\u5167\u5bb9\uff1a</span>
+                  <span class="text-xs font-mono text-slate-500 font-normal">(\u520a\u767b\u8d77\u8a16\u6642\u9593\uff1a${ann.startDate} ~ ${ann.endDate})</span>
+                </div>
+                <div class="p-3.5 bg-white rounded-xl border border-slate-200 text-slate-800 font-medium shadow-2xs">
+                  ${ann.content || '\u7121\u8a73\u7d30\u8aaa\u660e'}
+                </div>
+              </td>
+            </tr>
           `;
         }).join('');
+        modalBody.innerHTML = `
+          <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 text-xs font-extrabold text-slate-700 bg-slate-100/90">
+                  <th class="py-3 px-4 w-28 shrink-0">\u65e5\u671f</th>
+                  <th class="py-3 px-3 w-28 text-center shrink-0">\u5206\u985e</th>
+                  <th class="py-3 px-4">\u516c\u544a\u6a19\u984c</th>
+                  <th class="py-3 px-3 w-20 text-center shrink-0">\u8a73\u60c5</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                ${rowsHTML}
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    }
+  },
+  toggleAnnouncementDetail(id) {
+    const detailRow = document.getElementById(`annDetail_${id}`);
+    const btnSpan = document.getElementById(`annBtn_${id}`);
+    if (detailRow) {
+      if (detailRow.classList.contains('hidden')) {
+        detailRow.classList.remove('hidden');
+        if (btnSpan) btnSpan.textContent = '\u6536\u8d77 \u25b4';
+      } else {
+        detailRow.classList.add('hidden');
+        if (btnSpan) btnSpan.textContent = '\u89c0\u770b \u25be';
       }
     }
   },
@@ -450,6 +499,129 @@
   showToast(msg, type = 'info') {
     if (window.App && window.App.showToast) window.App.showToast(msg, type);
     else alert(msg);
+  },
+  activeAnnouncementCategory: 'ALL',
+  announcementSearchKeyword: '',
+  filterAnnouncementCategory(cat) {
+    this.activeAnnouncementCategory = cat;
+    document.querySelectorAll('.ann-cat-pill').forEach(btn => {
+      if (btn.getAttribute('data-ann-cat') === cat) {
+        btn.className = 'ann-cat-pill active px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-2xs transition-all cursor-pointer';
+      } else {
+        btn.className = 'ann-cat-pill px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all cursor-pointer';
+      }
+    });
+    this.renderAnnouncementsPage();
+  },
+  handleAnnouncementSearch() {
+    const input = document.getElementById('announcementSearchInput');
+    const clearBtn = document.getElementById('announcementSearchClearBtn');
+    if (input) {
+      this.announcementSearchKeyword = input.value.trim().toLowerCase();
+      if (clearBtn) {
+        if (input.value.length > 0) clearBtn.classList.remove('hidden');
+        else clearBtn.classList.add('hidden');
+      }
+    }
+    this.renderAnnouncementsPage();
+  },
+  clearAnnouncementSearch() {
+    const input = document.getElementById('announcementSearchInput');
+    const clearBtn = document.getElementById('announcementSearchClearBtn');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.classList.add('hidden');
+    this.announcementSearchKeyword = '';
+    this.renderAnnouncementsPage();
+  },
+  renderAnnouncementsPage() {
+    const container = document.getElementById('announcementsPageTableContainer');
+    if (!container) return;
+    const allAnnouncements = window.FitnessStore.getAnnouncements() || [];
+    const today = new Date().toISOString().slice(0, 10);
+    let list = allAnnouncements.filter(ann => {
+      const start = ann.startDate || '2000-01-01';
+      const end = ann.endDate || '2099-12-31';
+      const isPublished = ann.isPublished !== false;
+      return isPublished && start <= today && today <= end;
+    });
+    if (this.activeAnnouncementCategory !== 'ALL') {
+      list = list.filter(ann => ann.category === this.activeAnnouncementCategory);
+    }
+    if (this.announcementSearchKeyword) {
+      const kw = this.announcementSearchKeyword;
+      list = list.filter(ann => (ann.title || '').toLowerCase().includes(kw) || (ann.content || '').toLowerCase().includes(kw));
+    }
+    list.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+    if (list.length === 0) {
+      container.innerHTML = `<div class="bg-slate-50 rounded-xl border border-slate-200 border-dashed p-10 text-center text-slate-400 font-bold">\u7121\u7b26\u5408\u689d\u4ef6\u4e4b\u6700\u65b0\u516c\u544a\u4e8b\u9805</div>`;
+      return;
+    }
+    const badgeColors = {
+      '\u91cd\u8981\u901a\u77e5': 'bg-rose-50 text-rose-700 border-rose-200',
+      '\u88dc\u6e2c\u516c\u544a': 'bg-blue-50 text-blue-700 border-blue-200',
+      '\u7533\u8fa6\u63d0\u9192': 'bg-amber-50 text-amber-800 border-amber-200',
+      '\u8ab2\u7a0b\u8cc7\u8a0a': 'bg-emerald-50 text-emerald-800 border-emerald-200'
+    };
+    const rowsHTML = list.map(ann => {
+      const badgeClass = badgeColors[ann.category] || 'bg-slate-100 text-slate-700 border-slate-200';
+      const isPinnedCard = ann.isPinned;
+      return `
+        <tr class="hover:bg-slate-50/80 transition-colors cursor-pointer ${isPinnedCard ? 'bg-amber-50/30' : ''}" onclick="StudentPortal.toggleAnnouncementDetail('${ann.id}')">
+          <td class="py-4 px-5 font-mono text-sm text-slate-600 font-semibold whitespace-nowrap align-top">
+            ${ann.startDate || ann.createdAt?.slice(0, 10) || ''}
+          </td>
+          <td class="py-4 px-4 text-center whitespace-nowrap align-top">
+            <span class="text-xs font-extrabold px-2.5 py-1 rounded-md border ${badgeClass}">
+              ${ann.category || '\u91cd\u8981\u901a\u77e5'}
+            </span>
+          </td>
+          <td class="py-4 px-5 text-slate-900 font-bold text-[15px] leading-relaxed align-top">
+            <div class="flex items-center gap-2 flex-wrap">
+              ${isPinnedCard ? `<span class="bg-rose-600 text-white text-[11px] font-black px-2 py-0.5 rounded-md shadow-2xs shrink-0 tracking-wider">\u7f6e\u9802</span>` : ''}
+              <span class="hover:text-blue-600 transition-colors">${ann.title}</span>
+            </div>
+          </td>
+        </tr>
+        <tr id="annDetail_${ann.id}" class="hidden bg-slate-50 border-b border-slate-200">
+          <td colspan="3" class="p-5 text-sm text-slate-700 leading-relaxed font-medium border-t border-slate-200">
+            <div class="font-extrabold text-slate-900 mb-2 flex items-center justify-between flex-wrap gap-2">
+              <span class="text-blue-900 text-base">\ud83d\udccc \u516c\u544a\u8a73\u7d30\u8aaa\u660e\u5167\u5bb9\uff1a</span>
+              <span class="text-xs font-mono text-slate-500 font-normal">(\u520a\u767b\u8d77\u8a16\u6642\u9593\uff1a${ann.startDate} ~ ${ann.endDate})</span>
+            </div>
+            <div class="p-4 bg-white rounded-xl border border-slate-200 text-slate-800 font-medium shadow-2xs leading-relaxed whitespace-pre-line">${(ann.content || '\u7121\u8a73\u7d30\u8aaa\u660e').trim()}</div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    container.innerHTML = `
+      <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-200 text-sm font-extrabold text-slate-700 bg-slate-50">
+              <th class="py-3.5 px-5 w-32 shrink-0">\u65e5\u671f</th>
+              <th class="py-3.5 px-4 w-36 text-center shrink-0">\u5206\u985e</th>
+              <th class="py-3.5 px-5">\u6a19\u984c</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            ${rowsHTML}
+          </tbody>
+        </table>
+      </div>
+    `;
+  },
+  toggleAnnouncementDetail(id) {
+    const targetRow = document.getElementById(`annDetail_${id}`);
+    if (!targetRow) return;
+    const isCurrentlyHidden = targetRow.classList.contains('hidden');
+    document.querySelectorAll('[id^="annDetail_"]').forEach(el => el.classList.add('hidden'));
+    if (isCurrentlyHidden) {
+      targetRow.classList.remove('hidden');
+    }
   }
 };
 document.addEventListener('DOMContentLoaded', () => {

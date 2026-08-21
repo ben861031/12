@@ -23,20 +23,30 @@
     this.currentTab = tab;
     const mainHeader = document.getElementById('mainTopHeader');
     const studentSec = document.getElementById('studentPortalSection');
+    const announcementsSec = document.getElementById('announcementsPortalSection');
     const adminSec = document.getElementById('adminPortalSection');
     const navStudent = document.getElementById('navStudentTab');
     const navAdmin = document.getElementById('navAdminTab');
     if (tab === 'student') {
       if (mainHeader) mainHeader.classList.remove('hidden');
-      studentSec.classList.remove('hidden');
-      adminSec.classList.add('hidden');
+      if (studentSec) studentSec.classList.remove('hidden');
+      if (announcementsSec) announcementsSec.classList.add('hidden');
+      if (adminSec) adminSec.classList.add('hidden');
       if (navStudent) navStudent.className = 'corp-segment-btn active';
       if (navAdmin) navAdmin.className = 'corp-segment-btn';
-      if (window.StudentPortal) window.StudentPortal.renderActiveAnnouncements();
+    } else if (tab === 'announcements') {
+      if (mainHeader) mainHeader.classList.remove('hidden');
+      if (studentSec) studentSec.classList.add('hidden');
+      if (announcementsSec) announcementsSec.classList.remove('hidden');
+      if (adminSec) adminSec.classList.add('hidden');
+      if (navStudent) navStudent.className = 'corp-segment-btn';
+      if (navAdmin) navAdmin.className = 'corp-segment-btn';
+      if (window.StudentPortal) window.StudentPortal.renderAnnouncementsPage();
     } else {
       if (mainHeader) mainHeader.classList.add('hidden');
-      studentSec.classList.add('hidden');
-      adminSec.classList.remove('hidden');
+      if (studentSec) studentSec.classList.add('hidden');
+      if (announcementsSec) announcementsSec.classList.add('hidden');
+      if (adminSec) adminSec.classList.remove('hidden');
       if (navStudent) navStudent.className = 'corp-segment-btn';
       if (navAdmin) navAdmin.className = 'corp-segment-btn active';
       window.AdminPortal.checkAuthAndRender();

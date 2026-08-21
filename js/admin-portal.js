@@ -1745,7 +1745,12 @@
   renderAnnouncementsManagement() {
     const tbody = document.getElementById('erpAnnouncementsTbody');
     if (!tbody) return;
-    const list = window.FitnessStore.getAnnouncements() || [];
+    let list = window.FitnessStore.getAnnouncements() || [];
+    list.sort((a, b) => {
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
     const today = new Date().toISOString().slice(0, 10);
     if (list.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" class="text-center py-10 text-slate-400 font-bold">\u76ee\u524d\u7121\u4efb\u4f55\u516c\u544a\u8cc7\u6599\uff0c\u9ede\u64ca\u53f3\u4e0a\u89d2\u6309\u9215\u5373\u53ef\u65b0\u589e</td></tr>`;
@@ -1761,18 +1766,37 @@
       const start = ann.startDate || '2000-01-01';
       const end = ann.endDate || '2099-12-31';
       let statusBadge = '';
-      if (today < start) {
-        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">\ud83d\udfe1 \u672a\u958b\u59cb</span>`;
+      let toggleBtn = '';
+      if (ann.isPublished === false) {
+        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">\u624b\u52d5\u4e0b\u67b6</span>`;
+        toggleBtn = `
+          <button onclick="AdminPortal.toggleAnnouncementStatus('${ann.id}')" class="text-emerald-700 hover:text-emerald-900 font-bold text-xs bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg transition-colors" title="\u91cd\u65b0\u4e0a\u67b6">
+            \u4e0a\u67b6
+          </button>`;
+      } else if (today < start) {
+        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">\u672a\u958b\u59cb</span>`;
+        toggleBtn = `
+          <button onclick="AdminPortal.toggleAnnouncementStatus('${ann.id}')" class="text-amber-700 hover:text-amber-900 font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-colors" title="\u624b\u52d5\u4e0b\u67b6 (\u5b78\u751f\u7aef\u96b1\u85cf)">
+            \u4e0b\u67b6
+          </button>`;
       } else if (today > end) {
-        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">\ud83d\udd34 \u5df2\u904e\u671f</span>`;
+        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-500 border border-slate-200">\u5df2\u904e\u671f</span>`;
+        toggleBtn = `
+          <button onclick="AdminPortal.toggleAnnouncementStatus('${ann.id}')" class="text-amber-700 hover:text-amber-900 font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-colors" title="\u624b\u52d5\u4e0b\u67b6 (\u5b78\u751f\u7aef\u96b1\u85cf)">
+            \u4e0b\u67b6
+          </button>`;
       } else {
-        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">\ud83d\udfe2 \u520a\u767b\u4e2d</span>`;
+        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">\u520a\u767b\u4e2d</span>`;
+        toggleBtn = `
+          <button onclick="AdminPortal.toggleAnnouncementStatus('${ann.id}')" class="text-amber-700 hover:text-amber-900 font-bold text-xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg transition-colors" title="\u624b\u52d5\u4e0b\u67b6 (\u5b78\u751f\u7aef\u96b1\u85cf)">
+            \u4e0b\u67b6
+          </button>`;
       }
       const catBadge = badgeColors[ann.category] || 'bg-blue-50 text-blue-700 border-blue-200';
       return `
         <tr>
           <td class="text-center">
-            ${ann.isPinned ? `<span class="text-rose-600 font-black text-sm">\ud83d\udccc \u662f</span>` : `<span class="text-slate-400 text-xs">\u5426</span>`}
+            ${ann.isPinned ? `<span class="bg-rose-600 text-white text-xs font-black px-2 py-0.5 rounded-md shadow-2xs">\u7f6e\u9802</span>` : `<span class="text-slate-400 text-xs">\u5426</span>`}
           </td>
           <td class="text-center">
             <span class="px-2.5 py-1 rounded-md text-xs font-bold border ${catBadge}">${ann.category || '\u91cd\u8981\u901a\u77e5'}</span>
@@ -1788,7 +1812,8 @@
             ${statusBadge}
           </td>
           <td class="text-center">
-            <div class="flex items-center justify-center gap-2">
+            <div class="flex items-center justify-center gap-1.5">
+              ${toggleBtn}
               <button onclick="AdminPortal.openAnnouncementModal('${ann.id}')" class="text-blue-600 hover:text-blue-800 font-bold text-xs bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors">
                 \u7de8\u8f2f
               </button>
@@ -1802,12 +1827,26 @@
     }).join('');
   },
   editingAnnouncementId: null,
+  toggleAnnouncementStatus(id) {
+    const list = window.FitnessStore.getAnnouncements() || [];
+    const ann = list.find(a => a.id === id);
+    if (!ann) return;
+    const newStatus = ann.isPublished === false ? true : false;
+    window.FitnessStore.updateAnnouncement(id, { isPublished: newStatus });
+    if (newStatus) {
+      this.showToast(`\u5df2\u91cd\u65b0\u4e0a\u67b6\u516c\u544a\u3010${ann.title}\u3011`, 'success');
+    } else {
+      this.showToast(`\u5df2\u6210\u529f\u4e0b\u67b6\u516c\u544a\u3010${ann.title}\u3011(\u5b78\u751f\u7aef\u5df2\u96b1\u85cf)`, 'info');
+    }
+    this.renderAnnouncementsManagement();
+  },
   openAnnouncementModal(id = null) {
     this.editingAnnouncementId = id;
     const modalHeader = document.getElementById('announcementModalHeader');
     const inputTitle = document.getElementById('announcementInputTitle');
     const selectCategory = document.getElementById('announcementSelectCategory');
     const inputIsPinned = document.getElementById('announcementInputIsPinned');
+    const inputIsPublished = document.getElementById('announcementInputIsPublished');
     const inputStartDate = document.getElementById('announcementInputStartDate');
     const inputEndDate = document.getElementById('announcementInputEndDate');
     const inputContent = document.getElementById('announcementInputContent');
@@ -1820,6 +1859,7 @@
         if (inputTitle) inputTitle.value = ann.title || '';
         if (selectCategory) selectCategory.value = ann.category || '\u91cd\u8981\u901a\u77e5';
         if (inputIsPinned) inputIsPinned.checked = !!ann.isPinned;
+        if (inputIsPublished) inputIsPublished.checked = ann.isPublished !== false;
         if (inputStartDate) inputStartDate.value = ann.startDate || today;
         if (inputEndDate) inputEndDate.value = ann.endDate || '2099-12-31';
         if (inputContent) inputContent.value = ann.content || '';
@@ -1829,6 +1869,7 @@
       if (inputTitle) inputTitle.value = '';
       if (selectCategory) selectCategory.value = '\u88dc\u6e2c\u516c\u544a';
       if (inputIsPinned) inputIsPinned.checked = false;
+      if (inputIsPublished) inputIsPublished.checked = true;
       if (inputStartDate) inputStartDate.value = today;
       const nextMonth = new Date();
       nextMonth.setDate(nextMonth.getDate() + 30);
@@ -1847,6 +1888,7 @@
     const title = document.getElementById('announcementInputTitle')?.value.trim();
     const category = document.getElementById('announcementSelectCategory')?.value;
     const isPinned = document.getElementById('announcementInputIsPinned')?.checked;
+    const isPublished = document.getElementById('announcementInputIsPublished')?.checked;
     const startDate = document.getElementById('announcementInputStartDate')?.value;
     const endDate = document.getElementById('announcementInputEndDate')?.value;
     const content = document.getElementById('announcementInputContent')?.value.trim();
@@ -1864,12 +1906,12 @@
     }
     if (this.editingAnnouncementId) {
       window.FitnessStore.updateAnnouncement(this.editingAnnouncementId, {
-        title, category, isPinned, startDate, endDate, content
+        title, category, isPinned, isPublished, startDate, endDate, content
       });
       this.showToast('\u5df2\u6210\u529f\u4fee\u8a02\u516c\u544a', 'success');
     } else {
       window.FitnessStore.addAnnouncement({
-        title, category, isPinned, startDate, endDate, content
+        title, category, isPinned, isPublished, startDate, endDate, content
       });
       this.showToast('\u5df2\u6210\u529f\u767c\u5e03\u65b0\u516c\u544a', 'success');
     }
