@@ -201,6 +201,7 @@ window.FitnessStore = {
       const remoteStudents = await window.FitnessFirebase.loadCollection('students');
       const remoteRecords = await window.FitnessFirebase.loadCollection('records');
       const remoteAnnouncements = await window.FitnessFirebase.loadCollection('announcements');
+      const remoteLogs = await window.FitnessFirebase.loadCollection('logs');
       const remoteSettings = await window.FitnessFirebase.loadCollection('settings');
       let updated = false;
       if (Array.isArray(remoteStudents) && remoteStudents.length > 0) {
@@ -229,6 +230,12 @@ window.FitnessStore = {
         this.cache.announcements = remoteAnnouncements;
         if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, remoteAnnouncements);
         try { localStorage.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(remoteAnnouncements)); } catch(e){}
+        updated = true;
+      }
+      if (Array.isArray(remoteLogs) && remoteLogs.length > 0) {
+        this.cache.logs = remoteLogs;
+        if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.LOGS, remoteLogs);
+        try { localStorage.setItem(this.STORAGE_KEYS.LOGS, JSON.stringify(remoteLogs)); } catch(e){}
         updated = true;
       }
       if (remoteSettings && typeof remoteSettings === 'object') {
@@ -436,16 +443,19 @@ window.FitnessStore = {
       const students = this.getStudents();
       const records = this.getFitnessRecords();
       const announcements = this.getAnnouncements();
+      const logs = this.getLogs();
       const settings = this.settings;
       await window.FitnessFirebase.saveCollection('students', students);
       await window.FitnessFirebase.saveCollection('records', records);
       await window.FitnessFirebase.saveCollection('announcements', announcements);
+      await window.FitnessFirebase.saveCollection('logs', logs);
       await window.FitnessFirebase.saveCollection('settings', settings);
       return {
         success: true,
         studentCount: students.length,
         recordCount: records.length,
-        annCount: announcements.length
+        annCount: announcements.length,
+        logCount: logs.length
       };
     } catch (err) {
       console.error('Firebase \u5168\u91cf\u63a8\u64ad\u5931\u6557:', err);
@@ -723,15 +733,32 @@ window.FitnessStore = {
       this.saveStudents(students);
     }
   },
+  getCurrentOperatorName() {
+    if (window.AdminPortal && window.AdminPortal.currentAdminUser && window.AdminPortal.currentAdminUser.name) {
+      return window.AdminPortal.currentAdminUser.name;
+    }
+    try {
+      const stored = localStorage.getItem('CURRENT_ADMIN_USER');
+      if (stored) {
+        const u = JSON.parse(stored);
+        if (u && u.name) return u.name;
+      }
+    } catch(e) {}
+    return '\u8521\u96e8\u946b';
+  },
   addAuditLog(logEntry) {
     const logs = this.getLogs();
+    const currentOp = this.getCurrentOperatorName();
+    const activeOperator = (logEntry && logEntry.operator && logEntry.operator !== '\u7ba1\u7406\u54e1') 
+      ? logEntry.operator 
+      : currentOp;
     const newLog = {
       id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       timestamp: new Date().toISOString(),
-      operator: logEntry.operator || '\u7ba1\u7406\u54e1',
-      action: logEntry.action || '\u7cfb\u7d71\u8b8a\u66f4',
-      studentId: logEntry.studentId || '-',
-      details: logEntry.details || ''
+      operator: activeOperator,
+      action: logEntry ? (logEntry.action || '\u7cfb\u7d71\u8b8a\u66f4') : '\u7cfb\u7d71\u8b8a\u66f4',
+      studentId: logEntry ? (logEntry.studentId || '-') : '-',
+      details: logEntry ? (logEntry.details || '') : ''
     };
     logs.unshift(newLog);
     if (logs.length > 300) logs.pop();
@@ -741,12 +768,22 @@ window.FitnessStore = {
     if (this.cache.logs !== null) {
       return this.cache.logs;
     }
+    let list = [];
     try {
       const raw = localStorage.getItem(this.STORAGE_KEYS.LOGS);
-      return raw ? JSON.parse(raw) : [];
+      list = raw ? JSON.parse(raw) : [];
     } catch (e) {
-      return [];
+      list = [];
     }
+    const currentOp = this.getCurrentOperatorName();
+    list = list.map(l => {
+      if (!l.operator || l.operator === '\u7ba1\u7406\u54e1') {
+        return { ...l, operator: currentOp };
+      }
+      return l;
+    });
+    this.cache.logs = list;
+    return list;
   },
   saveLogs(logs) {
     this.cache.logs = logs;
@@ -754,6 +791,9 @@ window.FitnessStore = {
       FitnessIDB.setItem(this.STORAGE_KEYS.LOGS, logs).catch(err => {
         console.error('IndexedDB saveLogs \u5931\u6557:', err);
       });
+    }
+    if (window.FitnessFirebase && window.FitnessFirebase.isFirebaseActive) {
+      window.FitnessFirebase.saveCollection('logs', logs);
     }
     try {
       localStorage.setItem(this.STORAGE_KEYS.LOGS, JSON.stringify(logs));
