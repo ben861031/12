@@ -125,23 +125,16 @@
   <main id="announcementsPortalSection" class="hidden flex-1 max-w-5xl w-full mx-auto px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
     <div class="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-6 sm:p-8 space-y-6">
       <!-- \u6a19\u984c\u5340\u584a\u8207\u641c\u5c0b\u95dc\u9375\u5b57\u904e\u6ffe\u5217 -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-        <div>
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-            </div>
-            <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
-              \u6700\u65b0\u516c\u544a\u8207\u6ce8\u610f\u4e8b\u9805
-            </h2>
-          </div>
-          <p class="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-            \u9ad4\u80b2\u53ca\u6d3b\u52d5\u7d44\u6700\u65b0\u516c\u544a\u3001\u88dc\u6e2c\u6642\u7a0b\u3001\u9ad4\u4fdd/\u8eab\u969c\u6298\u62b5\u8207\u514d\u6e2c\u6ce8\u610f\u4e8b\u9805\u3002
-          </p>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="w-1.5 h-5 bg-blue-600 rounded-full shrink-0"></div>
+          <h2 class="text-lg sm:text-xl font-bold text-slate-800 tracking-tight">
+            \u6700\u65b0\u516c\u544a\u8207\u6ce8\u610f\u4e8b\u9805
+          </h2>
         </div>
         <!-- \u95dc\u9375\u5b57\u641c\u5c0b\u6846 -->
         <div class="relative w-full md:w-72">
-          <input type="text" id="announcementSearchInput" oninput="StudentPortal.handleAnnouncementSearch()" placeholder="\u641c\u5c0b\u516c\u544a\u6a19\u984c\u6216\u5167\u6587..." class="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-300 text-xs font-semibold focus:border-blue-600 focus:outline-none bg-slate-50 text-slate-900 transition-all">
+          <input type="text" id="announcementSearchInput" oninput="StudentPortal.handleAnnouncementSearch()" placeholder="\u641c\u5c0b\u516c\u544a\u6a19\u984c\u6216\u5167\u6587..." class="w-full pl-3.5 pr-8 py-2 rounded-xl border border-slate-200/90 text-xs font-medium focus:border-blue-600 focus:outline-none bg-slate-50/70 text-slate-800 transition-all placeholder:text-slate-400">
           <button type="button" id="announcementSearchClearBtn" onclick="StudentPortal.clearAnnouncementSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-slate-200/80 hover:bg-slate-300 text-slate-500 transition-all flex items-center justify-center cursor-pointer text-[10px] font-bold z-10">\u2715</button>
         </div>
       </div>
