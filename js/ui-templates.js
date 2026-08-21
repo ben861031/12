@@ -168,7 +168,7 @@
         </nav>
       </div>
       <!-- \u5de6\u5074\u5e95\u90e8\u7ba1\u7406\u8005\u5361\u7247 (\u5305\u542b\u5b78\u751f\u67e5\u8a62\u8207\u767b\u51fa\u5169\u5927\u6309\u9215) -->
-      <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs space-y-3">
+      <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs space-y-3 mt-6">
         <div class="flex items-center justify-between gap-1.5">
           <span id="sidebarAdminName" class="truncate font-black text-slate-900 text-xs sm:text-sm tracking-tight">\u8521\u96e8\u946b</span>
           <span id="sidebarAdminRoleBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">\u7cfb\u7d71\u7ba1\u7406\u54e1</span>
