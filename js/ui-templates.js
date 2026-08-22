@@ -234,12 +234,17 @@
         </nav>
       </div>
 
-      <!-- 左側底部管理者卡片 (包含學生查詢與登出兩大按鈕) -->
+      <!-- 左側底部登入者卡片（所有已登入同仁皆可修改自己的密碼） -->
       <div class="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs space-y-3 mt-6">
         <div class="flex items-center justify-between gap-1.5">
           <span id="sidebarAdminName" class="truncate font-black text-slate-900 text-xs sm:text-sm tracking-tight">未登入</span>
           <span id="sidebarAdminRoleBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">系統管理員</span>
         </div>
+
+        <button onclick="AdminPortal.openSelfPasswordModal()" class="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/90 font-bold py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98] cursor-pointer">
+          <svg class="w-3.5 h-3.5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          <span>修改我的密碼</span>
+        </button>
 
         <div class="grid grid-cols-2 gap-2">
           <button onclick="App.switchTab('student')" class="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200/80 font-bold py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1 shadow-2xs active:scale-[0.98] cursor-pointer">
@@ -271,6 +276,10 @@
           </div>
 
           <div class="mobile-admin-toolbar-actions flex items-center gap-1.5">
+            <button onclick="AdminPortal.openSelfPasswordModal()" title="修改我的密碼" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+              <span>改密碼</span>
+            </button>
             <button onclick="App.switchTab('student')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
               <span>學生查詢</span>
@@ -1855,6 +1864,42 @@
           <button id="adminAccountSaveBtn" onclick="AdminPortal.saveAdminAccountModal()" class="bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-wait text-white py-2.5 rounded-xl text-sm font-bold flex-1 shadow-xs">儲存設定</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- 11. 所有已登入教職員皆可使用的個人密碼修改 Modal -->
+  <div id="selfPasswordModal" role="dialog" aria-modal="true" aria-labelledby="selfPasswordModalTitle" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="corp-card max-w-md w-full p-5 sm:p-6 bg-white rounded-2xl border border-slate-200 shadow-xl">
+      <div class="flex justify-between items-center pb-3 border-b border-slate-100 mb-4">
+        <div>
+          <h3 id="selfPasswordModalTitle" class="font-bold text-slate-900 text-base">修改我的登入密碼</h3>
+          <p id="selfPasswordAccountHint" class="text-[11px] text-slate-500 mt-0.5">僅變更目前登入帳號</p>
+        </div>
+        <button type="button" onclick="AdminPortal.closeSelfPasswordModal()" aria-label="關閉修改密碼視窗" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+      </div>
+
+      <form class="space-y-4 text-sm" onsubmit="event.preventDefault(); AdminPortal.changeOwnPassword();">
+        <div>
+          <label for="selfPasswordCurrent" class="block font-bold text-slate-700 mb-1">目前密碼 <span class="text-rose-500">*</span></label>
+          <input type="password" id="selfPasswordCurrent" required autocomplete="current-password" placeholder="輸入目前登入密碼" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 text-sm focus:border-purple-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label for="selfPasswordNew" class="block font-bold text-slate-700 mb-1">新密碼 <span class="text-rose-500">*</span></label>
+          <input type="password" id="selfPasswordNew" required minlength="8" autocomplete="new-password" placeholder="至少 8 碼" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 text-sm focus:border-purple-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label for="selfPasswordConfirm" class="block font-bold text-slate-700 mb-1">再次輸入新密碼 <span class="text-rose-500">*</span></label>
+          <input type="password" id="selfPasswordConfirm" required minlength="8" autocomplete="new-password" placeholder="再次輸入相同的新密碼" class="w-full px-4 py-2.5 border border-slate-300 rounded-xl font-mono text-slate-900 text-sm focus:border-purple-500 focus:outline-none">
+          <p class="text-[11px] leading-relaxed text-slate-500 mt-1.5">密碼只會送往 Firebase Authentication，不會儲存在 Firestore 或 GitHub。</p>
+        </div>
+
+        <div class="flex gap-3 pt-3">
+          <button type="button" onclick="AdminPortal.closeSelfPasswordModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-sm font-bold flex-1">取消</button>
+          <button id="selfPasswordSaveBtn" type="submit" class="bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-wait text-white py-2.5 rounded-xl text-sm font-bold flex-1 shadow-xs">更新密碼</button>
+        </div>
+      </form>
     </div>
   </div>
 

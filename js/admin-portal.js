@@ -2384,6 +2384,94 @@ window.AdminPortal = {
     }
   },
 
+  openSelfPasswordModal() {
+    if (!this.isAdminLoggedIn || !this.currentAdminUser) {
+      this.showToast('請先登入管理後台', 'warning');
+      return;
+    }
+
+    ['selfPasswordCurrent', 'selfPasswordNew', 'selfPasswordConfirm'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) input.value = '';
+    });
+
+    const hint = document.getElementById('selfPasswordAccountHint');
+    if (hint) {
+      const displayName = this.currentAdminUser.name || this.currentAdminUser.username || '目前帳號';
+      hint.textContent = `目前登入：${displayName}（僅變更自己的密碼）`;
+    }
+
+    const modal = document.getElementById('selfPasswordModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      window.setTimeout(() => document.getElementById('selfPasswordCurrent')?.focus(), 0);
+    }
+  },
+
+  closeSelfPasswordModal() {
+    document.getElementById('selfPasswordModal')?.classList.add('hidden');
+    ['selfPasswordCurrent', 'selfPasswordNew', 'selfPasswordConfirm'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) input.value = '';
+    });
+  },
+
+  async changeOwnPassword() {
+    if (!this.isAdminLoggedIn || !this.currentAdminUser) {
+      this.showToast('登入狀態已失效，請重新登入後再試', 'warning');
+      return;
+    }
+
+    const currentPassword = document.getElementById('selfPasswordCurrent')?.value || '';
+    const newPassword = document.getElementById('selfPasswordNew')?.value || '';
+    const confirmPassword = document.getElementById('selfPasswordConfirm')?.value || '';
+
+    if (!currentPassword) {
+      this.showToast('請輸入目前密碼', 'warning');
+      return;
+    }
+    if (newPassword.length < 8) {
+      this.showToast('新密碼至少需要 8 碼', 'warning');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      this.showToast('兩次輸入的新密碼不一致', 'warning');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      this.showToast('新密碼不可與目前密碼相同', 'warning');
+      return;
+    }
+
+    const saveButton = document.getElementById('selfPasswordSaveBtn');
+    const originalText = saveButton?.textContent || '更新密碼';
+    if (saveButton) {
+      saveButton.disabled = true;
+      saveButton.textContent = '更新中…';
+    }
+
+    try {
+      await window.FitnessFirebase.changeCurrentPassword(currentPassword, newPassword);
+      this.closeSelfPasswordModal();
+      this.showToast('您的 Firebase 登入密碼已更新', 'success');
+    } catch (err) {
+      const rawMessage = `${err?.code || ''} ${err?.message || ''}`;
+      const message = /wrong-password|invalid-credential|invalid-login-credentials/i.test(rawMessage)
+        ? '目前密碼不正確，請重新輸入'
+        : /weak-password/i.test(rawMessage)
+          ? '新密碼強度不足，請改用更安全的密碼'
+          : /requires-recent-login/i.test(rawMessage)
+            ? '登入時間已過久，請登出後重新登入再修改'
+            : (err?.message || '請重新登入後再試');
+      this.showToast(`密碼更新失敗：${message}`, 'danger');
+    } finally {
+      if (saveButton) {
+        saveButton.disabled = false;
+        saveButton.textContent = originalText;
+      }
+    }
+  },
+
   async renderAdminAccountsManagement() {
     const tbody = document.getElementById('erpAdminAccountsTbody');
     if (!tbody) return;
