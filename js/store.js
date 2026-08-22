@@ -1,7 +1,14 @@
-﻿const FitnessIDB = {
-  dbName: 'FitnessPlatformDB_V1',
+/**
+ * 體適能查詢與管理平台 - 中央資料庫 (Data Store Engine)
+ * 升級版：支援 IndexedDB 大容量資料庫與快取機制 (自動向下相容 LocalStorage 及自動備份轉移)
+ */
+
+// Native IndexedDB Promise Wrapper
+const FitnessIDB = {
+  dbName: 'FitnessPlatformDB_V2_SAFE',
   storeName: 'app_data',
   dbPromise: null,
+
   getDB() {
     if (!this.dbPromise) {
       this.dbPromise = new Promise((resolve, reject) => {
@@ -21,6 +28,7 @@
     }
     return this.dbPromise;
   },
+
   async getItem(key) {
     try {
       const db = await this.getDB();
@@ -36,6 +44,7 @@
       return null;
     }
   },
+
   async setItem(key, val) {
     try {
       const db = await this.getDB();
@@ -51,6 +60,7 @@
       return false;
     }
   },
+
   async removeItem(key) {
     try {
       const db = await this.getDB();
@@ -66,6 +76,7 @@
       return false;
     }
   },
+
   async clear() {
     try {
       const db = await this.getDB();
@@ -82,208 +93,163 @@
     }
   }
 };
+
 window.FitnessStore = {
   STORAGE_KEYS: {
-    STUDENTS: 'FITNESS_STORE_STUDENTS_V4',
-    TEST_RECORDS: 'FITNESS_STORE_RECORDS_V4',
-    LOGS: 'FITNESS_STORE_AUDIT_LOGS_V4',
-    SETTINGS: 'FITNESS_STORE_SETTINGS_V4',
-    ANNOUNCEMENTS: 'FITNESS_STORE_ANNOUNCEMENTS_V4'
+    STUDENTS: 'FITNESS_STORE_STUDENTS_V5_PRIVATE',
+    TEST_RECORDS: 'FITNESS_STORE_RECORDS_V5_PRIVATE',
+    LOGS: 'FITNESS_STORE_AUDIT_LOGS_V5_PRIVATE',
+    SETTINGS: 'FITNESS_STORE_SETTINGS_V5_PRIVATE',
+    ANNOUNCEMENTS: 'FITNESS_STORE_ANNOUNCEMENTS_V5_PUBLIC'
   },
+
   settings: {
     requiredPassCount: 2,
     schoolDomain: 'just.edu.tw',
-    schoolName: '\u666f\u6587\u79d1\u6280\u5927\u5b78',
+    schoolName: '景文科技大學',
     currentSemester: '1122',
-    importHistory: {},
-    adminAccount: { username: 'admin', passcode: 'admin123' }
+    importHistory: {}
   },
+
   selectedStudentIds: new Set(),
   listeners: [],
+
+  // 快取記憶體
   cache: {
     students: null,
     testRecords: null,
     logs: null,
     announcements: null
   },
+
   isIndexedDBActive: false,
   isReady: false,
+  lookupPublishTimer: null,
+
   subscribe(fn) {
     if (typeof fn === 'function') this.listeners.push(fn);
   },
+
   notify() {
     this.listeners.forEach(fn => fn());
   },
+
   async init() {
-    const savedSettings = localStorage.getItem(this.STORAGE_KEYS.SETTINGS);
-    if (savedSettings) {
-      try { this.settings = { ...this.settings, ...JSON.parse(savedSettings) }; } catch(e){}
-    }
+    // 公開頁面絕不讀取學生、成績、設定或稽核紀錄的本機快取。
+    this.cache.students = [];
+    this.cache.testRecords = [];
+    this.cache.logs = [];
+    this.isIndexedDBActive = false;
+
     try {
-      const idbStudents = await FitnessIDB.getItem(this.STORAGE_KEYS.STUDENTS);
-      const idbRecords = await FitnessIDB.getItem(this.STORAGE_KEYS.TEST_RECORDS);
-      const idbLogs = await FitnessIDB.getItem(this.STORAGE_KEYS.LOGS);
-      const idbSettings = await FitnessIDB.getItem(this.STORAGE_KEYS.SETTINGS);
-      const idbAnnouncements = await FitnessIDB.getItem(this.STORAGE_KEYS.ANNOUNCEMENTS);
-      this.isIndexedDBActive = true;
-      if (idbStudents === null && idbRecords === null) {
-        const lsStudents = localStorage.getItem(this.STORAGE_KEYS.STUDENTS);
-        const lsRecords = localStorage.getItem(this.STORAGE_KEYS.TEST_RECORDS);
-        const lsLogs = localStorage.getItem(this.STORAGE_KEYS.LOGS);
-        const lsAnnouncements = localStorage.getItem(this.STORAGE_KEYS.ANNOUNCEMENTS);
-        if (lsStudents || lsRecords || lsLogs || lsAnnouncements) {
-          console.log('\ud83d\ude80 \u6b63\u5728\u81ea\u52d5\u5c07 LocalStorage \u8cc7\u6599\u8f49\u79fb\u81f3 IndexedDB \u5927\u5bb9\u91cf\u8cc7\u6599\u5eab...');
-          const parsedStudents = lsStudents ? JSON.parse(lsStudents) : [];
-          const parsedRecords = lsRecords ? JSON.parse(lsRecords) : [];
-          const parsedLogs = lsLogs ? JSON.parse(lsLogs) : [];
-          const parsedAnnouncements = lsAnnouncements ? JSON.parse(lsAnnouncements) : this.getDefaultAnnouncements();
-          this.cache.students = parsedStudents;
-          this.cache.testRecords = parsedRecords;
-          this.cache.logs = parsedLogs;
-          this.cache.announcements = parsedAnnouncements;
-          await FitnessIDB.setItem(this.STORAGE_KEYS.STUDENTS, parsedStudents);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.TEST_RECORDS, parsedRecords);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.LOGS, parsedLogs);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.SETTINGS, this.settings);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, parsedAnnouncements);
-          console.log('\u2705 LocalStorage \u8cc7\u6599\u6210\u529f\u5099\u4efd\u5347\u7d1a\u81f3 IndexedDB\uff01');
-        } else {
-          this.cache.students = [];
-          this.cache.testRecords = [];
-          this.cache.logs = [];
-          this.cache.announcements = this.getDefaultAnnouncements();
-          await FitnessIDB.setItem(this.STORAGE_KEYS.STUDENTS, []);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.TEST_RECORDS, []);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.LOGS, []);
-          await FitnessIDB.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, this.cache.announcements);
-        }
-      } else {
-        this.cache.students = Array.isArray(idbStudents) ? idbStudents : [];
-        this.cache.testRecords = Array.isArray(idbRecords) ? idbRecords : [];
-        this.cache.logs = Array.isArray(idbLogs) ? idbLogs : [];
-        this.cache.announcements = Array.isArray(idbAnnouncements) ? idbAnnouncements : this.getDefaultAnnouncements();
-        if (idbSettings) {
-          this.settings = { ...this.settings, ...idbSettings };
-        }
-      }
-    } catch (err) {
-      console.warn('\u26a0\ufe0f IndexedDB \u555f\u52d5\u5931\u6557\uff0c\u56de\u9000\u81f3 LocalStorage \u6a21\u5f0f:', err);
-      this.isIndexedDBActive = false;
-      const rawStudents = localStorage.getItem(this.STORAGE_KEYS.STUDENTS);
-      const rawRecords = localStorage.getItem(this.STORAGE_KEYS.TEST_RECORDS);
-      const rawLogs = localStorage.getItem(this.STORAGE_KEYS.LOGS);
       const rawAnnouncements = localStorage.getItem(this.STORAGE_KEYS.ANNOUNCEMENTS);
-      this.cache.students = rawStudents ? JSON.parse(rawStudents) : [];
-      this.cache.testRecords = rawRecords ? JSON.parse(rawRecords) : [];
-      this.cache.logs = rawLogs ? JSON.parse(rawLogs) : [];
       this.cache.announcements = rawAnnouncements ? JSON.parse(rawAnnouncements) : this.getDefaultAnnouncements();
-    }
-    try {
-      await this.syncFromFirebase();
     } catch (e) {
-      console.log('\u521d\u6b21\u96f2\u7aef\u975c\u9ed8\u540c\u6b65:', e);
+      this.cache.announcements = this.getDefaultAnnouncements();
     }
+
+    try {
+      const remoteAnnouncements = await window.FitnessFirebase?.loadPublicAnnouncements();
+      if (Array.isArray(remoteAnnouncements)) {
+        this.cache.announcements = remoteAnnouncements;
+        localStorage.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(remoteAnnouncements));
+      }
+    } catch (e) {
+      console.warn('公告同步失敗，使用本機公告快取。', e);
+    }
+
     this.isReady = true;
     this.notify();
     if (window.App && window.App.updateFirebaseBadge) {
       window.App.updateFirebaseBadge();
     }
   },
+
   async syncFromFirebase() {
-    if (!window.FitnessFirebase) return { success: false, message: 'Firebase \u672a\u8f09\u5165' };
-    if (typeof firebase === 'undefined' && window.FitnessFirebase.ensureFirebaseSDK) {
-      await window.FitnessFirebase.ensureFirebaseSDK();
-    }
+    if (!window.FitnessFirebase) return { success: false, message: 'Firebase 未載入' };
     if (!window.FitnessFirebase.isFirebaseActive) {
       window.FitnessFirebase.init();
     }
+
     try {
+      await window.FitnessFirebase.requireAdmin();
       const remoteStudents = await window.FitnessFirebase.loadCollection('students');
       const remoteRecords = await window.FitnessFirebase.loadCollection('records');
       const remoteAnnouncements = await window.FitnessFirebase.loadCollection('announcements');
       const remoteLogs = await window.FitnessFirebase.loadCollection('logs');
       const remoteSettings = await window.FitnessFirebase.loadCollection('settings');
+
       let updated = false;
-      if (Array.isArray(remoteStudents) && remoteStudents.length > 0) {
-        const localTS = parseInt(localStorage.getItem(this.STORAGE_KEYS.STUDENTS + '_TS') || '0', 10);
-        if (!localTS || !this.cache.students || this.cache.students.length === 0) {
-          this.cache.students = remoteStudents;
-          if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.STUDENTS, remoteStudents);
-          try { localStorage.setItem(this.STORAGE_KEYS.STUDENTS, JSON.stringify(remoteStudents)); } catch(e){}
-          updated = true;
-        } else {
-          console.log('\u2139\ufe0f \u672c\u5730\u542b\u6709\u6700\u65b0\u4fee\u8a02\u8cc7\u6599\uff0c\u4fdd\u8b77\u672c\u5730\u7de8\u8f2f\u4e0d\u53d7\u5f71\u97ff\u3002');
-        }
+
+      if (Array.isArray(remoteStudents)) {
+        this.cache.students = remoteStudents;
+        updated = true;
       }
-      if (Array.isArray(remoteRecords) && remoteRecords.length > 0) {
-        const localTS = parseInt(localStorage.getItem(this.STORAGE_KEYS.TEST_RECORDS + '_TS') || '0', 10);
-        if (!localTS || !this.cache.testRecords || this.cache.testRecords.length === 0) {
-          this.cache.testRecords = remoteRecords;
-          if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.TEST_RECORDS, remoteRecords);
-          try { localStorage.setItem(this.STORAGE_KEYS.TEST_RECORDS, JSON.stringify(remoteRecords)); } catch(e){}
-          updated = true;
-        } else {
-          console.log('\u2139\ufe0f \u672c\u5730\u542b\u6709\u6700\u65b0\u4fee\u8a02\u6aa2\u6e2c\u7d00\u9304\uff0c\u4fdd\u8b77\u672c\u5730\u7de8\u8f2f\u4e0d\u53d7\u820a\u96f2\u7aef\u5f71\u97ff\u3002');
-        }
+
+      if (Array.isArray(remoteRecords)) {
+        this.cache.testRecords = remoteRecords;
+        updated = true;
       }
+
       if (Array.isArray(remoteAnnouncements) && remoteAnnouncements.length > 0) {
         this.cache.announcements = remoteAnnouncements;
-        if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, remoteAnnouncements);
         try { localStorage.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(remoteAnnouncements)); } catch(e){}
         updated = true;
       }
+
       if (Array.isArray(remoteLogs) && remoteLogs.length > 0) {
         this.cache.logs = remoteLogs;
-        if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.LOGS, remoteLogs);
-        try { localStorage.setItem(this.STORAGE_KEYS.LOGS, JSON.stringify(remoteLogs)); } catch(e){}
         updated = true;
       }
+
       if (remoteSettings && typeof remoteSettings === 'object') {
-        this.settings = { ...this.settings, ...remoteSettings };
-        if (this.isIndexedDBActive) await FitnessIDB.setItem(this.STORAGE_KEYS.SETTINGS, this.settings);
-        try { localStorage.setItem(this.STORAGE_KEYS.SETTINGS, JSON.stringify(this.settings)); } catch(e){}
+        const { adminAccount, adminAccounts, ...safeSettings } = remoteSettings;
+        this.settings = { ...this.settings, ...safeSettings };
         updated = true;
       }
+
       if (updated) {
         this.notify();
-        console.log('\u2601\ufe0f \u6210\u529f\u81ea\u52d5\u5f9e Firebase \u96f2\u7aef\u8f09\u5165\u6700\u65b0\u5168\u6821\u5b78\u7c4d\u8207\u6210\u7e3e\uff01');
+        console.log('已在管理員驗證後載入雲端資料。');
         return {
           success: true,
           studentCount: remoteStudents ? remoteStudents.length : 0,
           recordCount: remoteRecords ? remoteRecords.length : 0
         };
       } else {
-        return { success: false, message: '\u96f2\u7aef\u5c1a\u7121\u53ef\u8f09\u5165\u4e4b\u8cc7\u6599' };
+        return { success: false, message: '雲端尚無可載入之資料' };
       }
     } catch (err) {
-      console.error('syncFromFirebase \u5931\u6557:', err);
-      return { success: false, message: err.message || '\u62c9\u53d6\u96f2\u7aef\u8cc7\u6599\u5931\u6557' };
+      console.error('syncFromFirebase 失敗:', err);
+      return { success: false, message: err.message || '拉取雲端資料失敗' };
     }
   },
+
   getDefaultAnnouncements() {
     return [
       {
         id: 'ann_sample_1',
-        title: '\u5168\u6821\u5b78\u751f\u9ad4\u9069\u80fd\u7562\u696d\u9580\u6abb\u6aa2\u6e2c\u8207\u88dc\u6e2c\u5831\u540d\u9808\u77e5',
-        category: '\u88dc\u6e2c\u516c\u544a',
+        title: '全校學生體適能畢業門檻檢測與補測報名須知',
+        category: '補測公告',
         startDate: '2026-01-01',
         endDate: '2026-12-31',
         isPinned: true,
-        content: '\u5c1a\u672a\u9054\u5230\u7562\u696d\u9580\u6abb\uff08\u901a\u904e\u6b21\u6578\u672a\u6eff 2 \u6b21\uff09\u4e4b\u540c\u5b78\uff0c\u8acb\u4f9d\u898f\u5b9a\u5831\u540d\u6bcf\u5b78\u671f\u5168\u6821\u9ad4\u9069\u80fd\u88dc\u6e2c\uff0c\u6216\u9078\u4fee\u76f8\u95dc\u9ad4\u9069\u80fd\u88dc\u6551\u6559\u5b78\u8ab2\u7a0b\u3002',
+        content: '尚未達到畢業門檻（通過次數未滿 2 次）之同學，請依規定報名每學期全校體適能補測，或選修相關體適能補救教學課程。',
         createdAt: '2026-08-20'
       },
       {
         id: 'ann_sample_2',
-        title: '\u9ad4\u4fdd\u751f\u8207\u8eab\u969c\u514d\u6e2c\u8cc7\u683c\u63a1\u8a08\u8fa6\u7406\u63d0\u9192',
-        category: '\u7533\u8fa6\u63d0\u9192',
+        title: '體保生與身障免測資格採計辦理提醒',
+        category: '申辦提醒',
         startDate: '2026-01-01',
         endDate: '2026-12-31',
         isPinned: false,
-        content: '\u7b26\u5408\u8f49\u5b78\u6263\u62b5\u3001\u9ad4\u80b2\u4fdd\u9001\u751f\u6216\u9818\u6709\u8eab\u5fc3\u969c\u7919\u624b\u518a/\u91ab\u7642\u514d\u6e2c\u6838\u53ef\u4e4b\u540c\u5b78\uff0c\u8acb\u5099\u9f4a\u4f50\u8b49\u6587\u4ef6\u81f3\u9ad4\u80b2\u7d44\u8fa6\u7406\u9580\u6abb\u62b5\u514d\u767b\u8a18\u3002',
+        content: '符合轉學扣抵、體育保送生或領有身心障礙手冊/醫療免測核可之同學，請備齊佐證文件至體育組辦理門檻抵免登記。',
         createdAt: '2026-08-20'
       }
     ];
   },
+
   getAnnouncements() {
     if (this.cache.announcements !== null) {
       return this.cache.announcements;
@@ -295,11 +261,12 @@ window.FitnessStore = {
       return this.getDefaultAnnouncements();
     }
   },
+
   saveAnnouncements(announcements) {
     this.cache.announcements = announcements;
     if (this.isIndexedDBActive) {
       FitnessIDB.setItem(this.STORAGE_KEYS.ANNOUNCEMENTS, announcements).catch(err => {
-        console.error('IndexedDB saveAnnouncements \u5931\u6557:', err);
+        console.error('IndexedDB saveAnnouncements 失敗:', err);
       });
     }
     if (window.FitnessFirebase && window.FitnessFirebase.isFirebaseActive) {
@@ -310,12 +277,13 @@ window.FitnessStore = {
     } catch (e) {}
     this.notify();
   },
+
   addAnnouncement(annData) {
     const list = this.getAnnouncements();
     const newAnn = {
       id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      title: annData.title || '\u7121\u6a19\u984c\u516c\u544a',
-      category: annData.category || '\u91cd\u8981\u901a\u77e5',
+      title: annData.title || '無標題公告',
+      category: annData.category || '重要通知',
       startDate: annData.startDate || new Date().toISOString().slice(0, 10),
       endDate: annData.endDate || '2099-12-31',
       isPinned: !!annData.isPinned,
@@ -326,6 +294,7 @@ window.FitnessStore = {
     this.saveAnnouncements(list);
     return newAnn;
   },
+
   updateAnnouncement(id, updatedFields) {
     const list = this.getAnnouncements();
     const idx = list.findIndex(a => a.id === id);
@@ -338,89 +307,39 @@ window.FitnessStore = {
     this.saveAnnouncements(list);
     return list[idx];
   },
+
   deleteAnnouncement(id) {
     const list = this.getAnnouncements();
     const newList = list.filter(a => a.id !== id);
     this.saveAnnouncements(newList);
     return true;
   },
+
   saveSettings() {
-    try {
-      localStorage.setItem(this.STORAGE_KEYS.SETTINGS, JSON.stringify(this.settings));
-    } catch (e) {}
-    if (this.isIndexedDBActive) {
-      FitnessIDB.setItem(this.STORAGE_KEYS.SETTINGS, this.settings);
-    }
+    const { adminAccount, adminAccounts, ...safeSettings } = this.settings;
+    this.settings = safeSettings;
     if (window.FitnessFirebase && window.FitnessFirebase.isFirebaseActive) {
-      window.FitnessFirebase.saveCollection('settings', this.settings);
+      window.FitnessFirebase.saveCollection('settings', safeSettings).catch((err) => {
+        console.warn('系統設定尚未寫入雲端。', err);
+      });
     }
   },
+
   getAdminAccounts() {
-    if (!Array.isArray(this.settings.adminAccounts) || this.settings.adminAccounts.length === 0) {
-      this.settings.adminAccounts = [
-        { id: 'acc_master', username: (this.settings.adminAccount?.username || 'admin'), passcode: (this.settings.adminAccount?.passcode || 'admin123'), role: 'super_admin', name: '\u6700\u9ad8\u7ba1\u7406\u54e1', createdAt: '2026-08-20' },
-        { id: 'acc_staff1', username: 'staff', passcode: 'staff123', role: 'staff', name: '\u9ad4\u80b2\u7d44\u540c\u4ec1', createdAt: '2026-08-20' }
-      ];
-    }
-    return this.settings.adminAccounts;
+    const profile = window.FitnessFirebase?.currentAdminProfile;
+    return profile ? [{ id: profile.uid, username: profile.username, role: profile.role, name: profile.name }] : [];
   },
-  saveAdminAccounts(accounts) {
-    this.settings.adminAccounts = accounts;
-    this.saveSettings();
-    return true;
-  },
-  addAdminAccount(accData) {
-    const list = this.getAdminAccounts();
-    const newAcc = {
-      id: 'acc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
-      username: (accData.username || '').trim(),
-      passcode: (accData.passcode || '').trim(),
-      role: accData.role || 'staff', // 'super_admin' | 'staff'
-      name: (accData.name || accData.username || '\u540c\u4ec1').trim(),
-      createdAt: new Date().toLocaleDateString('zh-TW')
-    };
-    list.push(newAcc);
-    this.saveAdminAccounts(list);
-    return newAcc;
-  },
-  updateAdminAccount(id, updatedFields) {
-    const list = this.getAdminAccounts();
-    const idx = list.findIndex(a => a.id === id);
-    if (idx === -1) return false;
-    list[idx] = {
-      ...list[idx],
-      ...updatedFields,
-      updatedAt: new Date().toLocaleDateString('zh-TW')
-    };
-    this.saveAdminAccounts(list);
-    return list[idx];
-  },
-  deleteAdminAccount(id) {
-    const list = this.getAdminAccounts();
-    if (list.length <= 1) return false; // \u9632\u5446\uff1a\u81f3\u5c11\u4fdd\u7559\u4e00\u500b\u5e33\u865f
-    const newList = list.filter(a => a.id !== id);
-    this.saveAdminAccounts(newList);
-    return true;
-  },
-  getAdminCredentials() {
-    return { username: 'admin', passcode: 'admin123' };
-  },
-  authenticateAdmin(username, passcode) {
-    const list = this.getAdminAccounts();
-    const targetUser = (username || '').trim();
-    const targetPass = (passcode || '').trim();
-    const match = list.find(a => a.username === targetUser && a.passcode === targetPass);
-    if (match) return match;
-    const legacy = (typeof this.getAdminCredentials === 'function') ? this.getAdminCredentials() : { username: 'admin', passcode: 'admin123' };
-    if (legacy && targetUser === legacy.username && targetPass === legacy.passcode) {
-      return { id: 'acc_master', username: legacy.username, passcode: legacy.passcode, role: 'super_admin', name: '\u7cfb\u7d71\u7ba1\u7406\u54e1' };
-    }
-    return null;
-  },
+
+  addAdminAccount() { throw new Error('請於 Firebase Authentication 建立帳號並設定 Custom Claims。'); },
+  updateAdminAccount() { throw new Error('請於 Firebase Authentication 管理帳號與權限。'); },
+  deleteAdminAccount() { throw new Error('請於 Firebase Authentication 管理帳號與權限。'); },
+
   updateImportHistory(semesters) {
     if (!this.settings.importHistory) this.settings.importHistory = {};
     const now = new Date();
+    
     const formattedDate = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
     if (Array.isArray(semesters)) {
       semesters.forEach(sem => {
         this.settings.importHistory[sem] = formattedDate;
@@ -430,44 +349,49 @@ window.FitnessStore = {
     }
     this.saveSettings();
   },
+
   async syncAllToFirebase() {
-    if (!window.FitnessFirebase) return { success: false, message: 'Firebase SDK \u672a\u8f09\u5165' };
-    if (typeof firebase === 'undefined' && window.FitnessFirebase.ensureFirebaseSDK) {
-      await window.FitnessFirebase.ensureFirebaseSDK();
-    }
+    if (!window.FitnessFirebase) return { success: false, message: 'Firebase SDK 未載入' };
+    
     if (!window.FitnessFirebase.isFirebaseActive) {
       const ok = window.FitnessFirebase.init();
-      if (!ok) return { success: false, message: 'Firebase \u5c1a\u672a\u6b63\u78ba\u9023\u7dda\uff0c\u8acb\u6aa2\u67e5 API Key \u8207\u7db2\u8def' };
+      if (!ok) return { success: false, message: 'Firebase 尚未正確連線，請檢查 API Key 與網路' };
     }
+
     try {
       const students = this.getStudents();
       const records = this.getFitnessRecords();
       const announcements = this.getAnnouncements();
       const logs = this.getLogs();
-      const settings = this.settings;
+      const { adminAccount, adminAccounts, ...settings } = this.settings;
+
       await window.FitnessFirebase.saveCollection('students', students);
       await window.FitnessFirebase.saveCollection('records', records);
       await window.FitnessFirebase.saveCollection('announcements', announcements);
       await window.FitnessFirebase.saveCollection('logs', logs);
       await window.FitnessFirebase.saveCollection('settings', settings);
+      const published = await window.FitnessFirebase.publishStudentLookups(students, records);
+
       return {
         success: true,
         studentCount: students.length,
         recordCount: records.length,
         annCount: announcements.length,
-        logCount: logs.length
+        logCount: logs.length,
+        lookupCount: published.count
       };
     } catch (err) {
-      console.error('Firebase \u5168\u91cf\u63a8\u64ad\u5931\u6557:', err);
-      const isPermErr = /permission|\u6b0a\u9650/i.test(String(err.message || '')) || /permission-denied/i.test(String(err.code || ''));
+      console.error('Firebase 全量推播失敗:', err);
+      const isPermErr = /permission|權限/i.test(String(err.message || '')) || /permission-denied/i.test(String(err.code || ''));
       return { 
         success: false, 
         message: isPermErr 
-          ? 'Firebase \u6b0a\u9650\u88ab\u62d2\uff01\u8acb\u524d\u5f80 Firebase Console \u9801\u7c64\u5c07\u3010\u898f\u5247 Rules\u3011\u8a2d\u7f6e\u70ba allow read, write: if true; \u4e26\u9ede\u64ca\u300c\u767c\u5e03 Publish\u300d' 
-          : (err.message || '\u5beb\u5165\u5931\u6557\uff0c\u8acb\u78ba\u8a8d Firebase Rules \u898f\u5247') 
+          ? 'Firebase 權限被拒：請確認目前帳號具備 Custom Claims，且安全規則已部署至 fitness 命名資料庫。' 
+          : (err.message || '寫入失敗，請確認 Firebase Rules 規則') 
       };
     }
   },
+
   getStudents() {
     if (this.cache.students !== null) {
       return this.cache.students;
@@ -479,12 +403,14 @@ window.FitnessStore = {
       return [];
     }
   },
+
   getStudentById(studentId) {
     if (!studentId) return null;
     const cleanId = String(studentId).trim().toLowerCase();
     const students = this.getStudents();
     return students.find(s => String(s.studentId).trim().toLowerCase() === cleanId) || null;
   },
+
   getEnrollYearFromStudentId(studentId) {
     if (!studentId) return '110';
     const str = String(studentId).trim();
@@ -497,6 +423,7 @@ window.FitnessStore = {
     }
     return '110';
   },
+
   saveStudent(student) {
     if (!student || !student.studentId) return false;
     const students = this.getStudents();
@@ -510,84 +437,89 @@ window.FitnessStore = {
     this.saveStudents(students);
     return true;
   },
+
   saveStudents(students) {
-    const nowTs = Date.now();
+    // 私人學生資料只保留在已登入管理員分頁的記憶體中。
     this.cache.students = students;
     this.notify();
-    if (this.isIndexedDBActive) {
-      FitnessIDB.setItem(this.STORAGE_KEYS.STUDENTS, students).catch(err => {
-        console.error('IndexedDB saveStudents \u5931\u6557:', err);
-      });
-      FitnessIDB.setItem(this.STORAGE_KEYS.STUDENTS + '_TS', nowTs);
-    }
-    try {
-      localStorage.setItem(this.STORAGE_KEYS.STUDENTS, JSON.stringify(students));
-      localStorage.setItem(this.STORAGE_KEYS.STUDENTS + '_TS', nowTs.toString());
-    } catch (e) {
-      console.warn('\u26a0\ufe0f LocalStorage \u5df2\u9054 5MB \u4e0a\u9650\uff0c\u5df2\u6539\u70ba\u5168\u91cf\u5beb\u5165 IndexedDB \u5927\u5bb9\u91cf\u8cc7\u6599\u5eab\u3002');
-    }
-    if (window.FitnessFirebase) {
+
+    if (window.FitnessFirebase?.currentAdminProfile) {
       window.FitnessFirebase.saveCollection('students', students).then(() => {
-        console.log('\ud83d\udd25 \u5b78\u751f\u4e3b\u6a94\u5df2\u6210\u529f\u5207\u5206\u4e26\u540c\u6b65\u4e0a\u50b3\u81f3 Cloud Firebase\uff01');
+        console.log('學生主檔已同步至 Firebase。');
       }).catch(err => {
-        console.warn('\u26a0\ufe0f \u5b78\u751f\u4e3b\u6a94 Firebase \u4e0a\u50b3\u53d7\u963b (\u53ef\u80fd Firebase Rules \u8a2d\u70ba\u552f\u8b80):', err);
+        console.warn('學生主檔尚未寫入 Firebase：', err);
+        if (window.App) window.App.showToast('雲端儲存失敗，請勿關閉頁面並重新同步', 'danger');
       });
+      this.scheduleStudentLookupPublish();
     }
   },
-  updateStudent(studentId, updatedFields, operatorName = '\u7ba1\u7406\u54e1') {
+
+  updateStudent(studentId, updatedFields, operatorName = '管理員') {
     const students = this.getStudents();
     const index = students.findIndex(s => String(s.studentId).trim() === String(studentId).trim());
     if (index === -1) return false;
+
     const oldData = { ...students[index] };
     const newData = {
       ...oldData,
       ...updatedFields,
       updatedAt: new Date().toLocaleDateString('zh-TW')
     };
+
     let semPassSum = 0;
     if (newData.semesters) {
       Object.values(newData.semesters).forEach(val => {
         if (Number(val) === 1) semPassSum += 1;
       });
     }
+
     let transferAdd = Number(newData.transferCredit || 0);
     let exemptAdd = Number(newData.exemptCredit || 0);
+
     let totalPass = semPassSum + transferAdd + exemptAdd;
     if (updatedFields.passCount !== undefined) {
       totalPass = Math.max(totalPass, Number(updatedFields.passCount));
     }
+
     newData.passCount = totalPass;
-    const isExempt = (Number(newData.isExemptAthleteOrDisabled) > 0) || (exemptAdd > 0) || /\u514d\u6e2c|\u8eab\u969c|\u9ad4\u4fdd/.test(newData.specialIdentity || '');
+
+    const isExempt = (Number(newData.isExemptAthleteOrDisabled) > 0) || (exemptAdd > 0) || /免測|身障|體保/.test(newData.specialIdentity || '');
     const reqPass = this.settings.requiredPassCount || 2;
+
     if (isExempt) {
-      newData.status = '\u901a\u904e';
+      newData.status = '通過';
       newData.deficitCount = 0;
     } else if (newData.manualStatusOverride) {
       newData.status = newData.manualStatusOverride;
-      newData.deficitCount = newData.status === '\u901a\u904e' ? 0 : Math.max(0, reqPass - totalPass);
+      newData.deficitCount = newData.status === '通過' ? 0 : Math.max(0, reqPass - totalPass);
     } else {
-      newData.status = totalPass >= reqPass ? '\u901a\u904e' : '\u4e0d\u901a\u904e';
-      newData.deficitCount = newData.status === '\u901a\u904e' ? 0 : Math.max(0, reqPass - totalPass);
+      newData.status = totalPass >= reqPass ? '通過' : '不通過';
+      newData.deficitCount = newData.status === '通過' ? 0 : Math.max(0, reqPass - totalPass);
     }
+
     students[index] = newData;
     this.saveStudents(students);
+
     this.addAuditLog({
       operator: operatorName,
-      action: '\u7de8\u8f2f\u5b78\u751f\u6a94\u6848',
+      action: '編輯學生檔案',
       studentId: studentId,
-      details: `\u4fee\u8a02\u5b78\u865f [${studentId}] (${newData.name})\uff1a\u901a\u904e\u6b21\u6578 ${newData.passCount}\uff0c\u72c0\u614b ${newData.status}`
+      details: `修訂學號 [${studentId}] (${newData.name})：通過次數 ${newData.passCount}，狀態 ${newData.status}`
     });
+
     return newData;
   },
-  bulkUpdateStatus(studentIds, newStatus, specialIdentity = '', notes = '', operatorName = '\u7ba1\u7406\u54e1') {
+
+  bulkUpdateStatus(studentIds, newStatus, specialIdentity = '', notes = '', operatorName = '管理員') {
     if (!studentIds || studentIds.length === 0) return;
     const students = this.getStudents();
     let updatedCount = 0;
+
     students.forEach(s => {
       if (studentIds.includes(s.studentId)) {
         if (newStatus) {
           s.status = newStatus;
-          s.deficitCount = newStatus === '\u901a\u904e' ? 0 : Math.max(0, 2 - (s.passCount || 0));
+          s.deficitCount = newStatus === '通過' ? 0 : Math.max(0, 2 - (s.passCount || 0));
         }
         if (specialIdentity !== undefined) s.specialIdentity = specialIdentity;
         if (notes) s.notes = notes;
@@ -595,16 +527,20 @@ window.FitnessStore = {
         updatedCount++;
       }
     });
+
     this.saveStudents(students);
     this.selectedStudentIds.clear();
+
     this.addAuditLog({
       operator: operatorName,
-      action: '\u6279\u91cf\u4f5c\u696d',
+      action: '批量作業',
       studentId: 'MULTI',
-      details: `\u6279\u91cf\u4fee\u6539 ${updatedCount} \u4f4d\u5b78\u751f\u72c0\u614b\u70ba [${newStatus}]`
+      details: `批量修改 ${updatedCount} 位學生狀態為 [${newStatus}]`
     });
+
     return updatedCount;
   },
+
   getFitnessRecords(studentId = null) {
     let records = [];
     if (this.cache.testRecords !== null) {
@@ -622,30 +558,35 @@ window.FitnessStore = {
     }
     return records;
   },
+
   saveFitnessRecords(records) {
-    const nowTs = Date.now();
     this.cache.testRecords = records;
     this.notify();
-    if (this.isIndexedDBActive) {
-      FitnessIDB.setItem(this.STORAGE_KEYS.TEST_RECORDS, records).catch(err => {
-        console.error('IndexedDB saveFitnessRecords \u5931\u6557:', err);
-      });
-      FitnessIDB.setItem(this.STORAGE_KEYS.TEST_RECORDS + '_TS', nowTs);
-    }
-    try {
-      localStorage.setItem(this.STORAGE_KEYS.TEST_RECORDS, JSON.stringify(records));
-      localStorage.setItem(this.STORAGE_KEYS.TEST_RECORDS + '_TS', nowTs.toString());
-    } catch (e) {
-      console.warn('\u26a0\ufe0f LocalStorage \u5df2\u9054\u5bb9\u91cf\u4e0a\u9650\uff0c\u9ad4\u9069\u80fd\u6aa2\u6e2c\u7d00\u9304\u5df2\u5168\u91cf\u5beb\u5165 IndexedDB\u3002');
-    }
-    if (window.FitnessFirebase) {
+
+    if (window.FitnessFirebase?.currentAdminProfile) {
       window.FitnessFirebase.saveCollection('records', records).then(() => {
-        console.log('\ud83d\udd25 \u6aa2\u6e2c\u7d00\u9304\u5df2\u6210\u529f\u540c\u6b65\u4e0a\u50b3\u81f3 Cloud Firebase\uff01');
+        console.log('檢測紀錄已同步至 Firebase。');
       }).catch(err => {
-        console.warn('\u26a0\ufe0f \u6aa2\u6e2c\u7d00\u9304 Firebase \u4e0a\u50b3\u53d7\u963b:', err);
+        console.warn('檢測紀錄尚未寫入 Firebase：', err);
+        if (window.App) window.App.showToast('成績尚未寫入雲端，請重新同步', 'danger');
       });
+      this.scheduleStudentLookupPublish();
     }
   },
+
+  scheduleStudentLookupPublish() {
+    if (this.lookupPublishTimer) clearTimeout(this.lookupPublishTimer);
+    this.lookupPublishTimer = setTimeout(async () => {
+      this.lookupPublishTimer = null;
+      try {
+        await window.FitnessFirebase.publishStudentLookups(this.getStudents(), this.getFitnessRecords());
+      } catch (err) {
+        console.warn('學生單筆查詢索引尚未更新：', err);
+        if (window.App) window.App.showToast('學生查詢索引更新失敗，請執行全量同步', 'warning');
+      }
+    }, 1200);
+  },
+
   saveFitnessRecord(record) {
     if (!record || !record.studentId) return false;
     const records = this.getFitnessRecords();
@@ -659,69 +600,94 @@ window.FitnessStore = {
     this.recalculateStudentPassCount(record.studentId);
     return true;
   },
-  updateFitnessRecord(studentId, semester, updatedData, operatorName = '\u7ba1\u7406\u54e1') {
+
+  updateFitnessRecord(studentId, semester, updatedData, operatorName = '管理員') {
     const records = this.getFitnessRecords();
     const index = records.findIndex(r => String(r.studentId) === String(studentId) && String(r.semester) === String(semester));
     if (index === -1) return false;
+
     records[index] = {
       ...records[index],
       ...updatedData
     };
     this.saveFitnessRecords(records);
+
     this.recalculateStudentPassCount(studentId);
+
     this.addAuditLog({
       operator: operatorName,
-      action: '\u7de8\u8f2f\u6aa2\u6e2c\u7d00\u9304',
+      action: '編輯檢測紀錄',
       studentId: studentId,
-      details: `\u4fee\u6539 ${semester} \u5b78\u671f\u6210\u7e3e\uff0c\u72c0\u614b\u8a2d\u70ba [${updatedData.status || records[index].status}]`
+      details: `修改 ${semester} 學期成績，狀態設為 [${updatedData.status || records[index].status}]`
     });
+
     return true;
   },
-  deleteFitnessRecord(studentId, semester, operatorName = '\u7ba1\u7406\u54e1') {
+
+  deleteFitnessRecord(studentId, semester, operatorName = '管理員') {
     let records = this.getFitnessRecords();
     const initialLength = records.length;
     records = records.filter(r => !(String(r.studentId) === String(studentId) && String(r.semester) === String(semester)));
+    
     if (records.length === initialLength) return false;
+
     this.saveFitnessRecords(records);
     this.recalculateStudentPassCount(studentId);
+
     this.addAuditLog({
       operator: operatorName,
-      action: '\u522a\u9664\u6aa2\u6e2c\u7d00\u9304',
+      action: '刪除檢測紀錄',
       studentId: studentId,
-      details: `\u522a\u9664 ${semester} \u5b78\u671f\u4e4b\u9ad4\u9069\u80fd\u6210\u7e3e\u7d00\u9304`
+      details: `刪除 ${semester} 學期之體適能成績紀錄`
     });
+
     return true;
   },
+
   recalculateStudentPassCount(studentId) {
     const student = this.getStudentById(studentId);
     if (!student) return;
+
+    // Get all current records for this student
     const records = this.getFitnessRecords(studentId);
+    
+    // Rebuild the student's semesters object based purely on records
     const newSemesters = {};
     records.forEach(r => {
-      const isPassedStatus = r.status === '\u5408\u683c' || r.status === '\u514d\u6e2c' || r.isPassed === true;
+      const isPassedStatus = r.status === '合格' || r.status === '免測' || r.isPassed === true;
       newSemesters[r.semester] = isPassedStatus ? 1 : 0;
     });
+
+    // We do NOT modify manual overrides here, we just recount based on truth
     let semPassSum = 0;
     Object.values(newSemesters).forEach(val => {
       if (Number(val) === 1) semPassSum += 1;
     });
+
     let transferAdd = Number(student.transferCredit || 0);
     let exemptAdd = Number(student.exemptCredit || 0);
-    const isExempt = (Number(student.isExemptAthleteOrDisabled) > 0) || (exemptAdd > 0) || /\u514d\u6e2c|\u8eab\u969c|\u9ad4\u4fdd/.test(student.specialIdentity || '');
+    
+    // Explicit exempt flag based on identity or setting
+    const isExempt = (Number(student.isExemptAthleteOrDisabled) > 0) || (exemptAdd > 0) || /免測|身障|體保/.test(student.specialIdentity || '');
+    
     let totalPass = semPassSum + transferAdd + exemptAdd;
     const reqPass = this.settings.requiredPassCount || 2;
+
     let newStatus = student.status;
     let deficitCount = 0;
+
     if (isExempt) {
-      newStatus = '\u901a\u904e';
+      newStatus = '通過';
       deficitCount = 0;
     } else if (student.manualStatusOverride) {
       newStatus = student.manualStatusOverride;
-      deficitCount = newStatus === '\u901a\u904e' ? 0 : Math.max(0, reqPass - totalPass);
+      deficitCount = newStatus === '通過' ? 0 : Math.max(0, reqPass - totalPass);
     } else {
-      newStatus = totalPass >= reqPass ? '\u901a\u904e' : '\u4e0d\u901a\u904e';
-      deficitCount = newStatus === '\u901a\u904e' ? 0 : Math.max(0, reqPass - totalPass);
+      newStatus = totalPass >= reqPass ? '通過' : '不通過';
+      deficitCount = newStatus === '通過' ? 0 : Math.max(0, reqPass - totalPass);
     }
+
+    // Direct update to student array to avoid circular log loops
     const students = this.getStudents();
     const index = students.findIndex(s => String(s.studentId) === String(studentId));
     if (index !== -1) {
@@ -733,30 +699,25 @@ window.FitnessStore = {
       this.saveStudents(students);
     }
   },
+
   getCurrentOperatorName() {
-    if (window.AdminPortal && window.AdminPortal.currentAdminUser && window.AdminPortal.currentAdminUser.name) {
-      return window.AdminPortal.currentAdminUser.name;
-    }
-    try {
-      const stored = localStorage.getItem('CURRENT_ADMIN_USER');
-      if (stored) {
-        const u = JSON.parse(stored);
-        if (u && u.name) return u.name;
-      }
-    } catch(e) {}
-    return '\u8521\u96e8\u946b';
+    return window.AdminPortal?.currentAdminUser?.name || '系統管理員';
   },
+
   addAuditLog(logEntry) {
     const logs = this.getLogs();
     const currentOp = this.getCurrentOperatorName();
-    const activeOperator = (logEntry && logEntry.operator && logEntry.operator !== '\u7ba1\u7406\u54e1') 
-      ? logEntry.operator 
-      : currentOp;
+
+    let activeOperator = (logEntry && logEntry.operator) ? logEntry.operator : currentOp;
+    if (!activeOperator || activeOperator === '7902' || activeOperator === 'admin' || activeOperator === '管理員' || /^\d+$/.test(activeOperator)) {
+      activeOperator = currentOp;
+    }
+
     const newLog = {
       id: 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
       timestamp: new Date().toISOString(),
       operator: activeOperator,
-      action: logEntry ? (logEntry.action || '\u7cfb\u7d71\u8b8a\u66f4') : '\u7cfb\u7d71\u8b8a\u66f4',
+      action: logEntry ? (logEntry.action || '系統變更') : '系統變更',
       studentId: logEntry ? (logEntry.studentId || '-') : '-',
       details: logEntry ? (logEntry.details || '') : ''
     };
@@ -764,10 +725,17 @@ window.FitnessStore = {
     if (logs.length > 300) logs.pop();
     this.saveLogs(logs);
   },
+
   getLogs() {
+    const normalizeLog = (l) => {
+      const op = l.operator;
+      return { ...l, operator: op || '系統管理員' };
+    };
+
     if (this.cache.logs !== null) {
-      return this.cache.logs;
+      return this.cache.logs.map(normalizeLog);
     }
+
     let list = [];
     try {
       const raw = localStorage.getItem(this.STORAGE_KEYS.LOGS);
@@ -775,49 +743,49 @@ window.FitnessStore = {
     } catch (e) {
       list = [];
     }
-    const currentOp = this.getCurrentOperatorName();
-    list = list.map(l => {
-      if (!l.operator || l.operator === '\u7ba1\u7406\u54e1') {
-        return { ...l, operator: currentOp };
-      }
-      return l;
-    });
+
+    list = list.map(normalizeLog);
     this.cache.logs = list;
     return list;
   },
+
   saveLogs(logs) {
     this.cache.logs = logs;
-    if (this.isIndexedDBActive) {
-      FitnessIDB.setItem(this.STORAGE_KEYS.LOGS, logs).catch(err => {
-        console.error('IndexedDB saveLogs \u5931\u6557:', err);
+    if (window.FitnessFirebase?.currentAdminProfile) {
+      window.FitnessFirebase.saveCollection('logs', logs).catch((err) => {
+        console.warn('操作紀錄尚未寫入 Firebase：', err);
       });
     }
-    if (window.FitnessFirebase && window.FitnessFirebase.isFirebaseActive) {
-      window.FitnessFirebase.saveCollection('logs', logs);
-    }
-    try {
-      localStorage.setItem(this.STORAGE_KEYS.LOGS, JSON.stringify(logs));
-    } catch (e) {}
   },
-  clearAllData() {
+
+  async clearAllData({ cloud = false } = {}) {
     this.cache.students = [];
     this.cache.testRecords = [];
     this.cache.logs = [];
-    if (this.isIndexedDBActive) {
-      FitnessIDB.clear().catch(err => console.error('IndexedDB clear \u5931\u6557:', err));
-    }
-    try {
-      localStorage.removeItem(this.STORAGE_KEYS.STUDENTS);
-      localStorage.removeItem(this.STORAGE_KEYS.TEST_RECORDS);
-      localStorage.removeItem(this.STORAGE_KEYS.LOGS);
-    } catch (e) {}
     this.selectedStudentIds.clear();
-    this.init();
+
+    if (cloud) {
+      await window.FitnessFirebase.requireAdmin();
+      await window.FitnessFirebase.saveCollection('students', []);
+      await window.FitnessFirebase.saveCollection('records', []);
+      await window.FitnessFirebase.saveCollection('logs', []);
+      await window.FitnessFirebase.publishStudentLookups([], []);
+    }
+    this.notify();
+    return true;
+  },
+
+  clearPrivateCache() {
+    this.cache.students = [];
+    this.cache.testRecords = [];
+    this.cache.logs = [];
+    this.selectedStudentIds.clear();
     this.notify();
   },
+
   async getStorageEstimateInfo() {
     let usageMB = '0.00';
-    let quotaMB = '\u7121\u4e0a\u9650';
+    let quotaMB = '無上限';
     if (navigator.storage && navigator.storage.estimate) {
       try {
         const estimate = await navigator.storage.estimate();
@@ -826,19 +794,21 @@ window.FitnessStore = {
       } catch(e) {}
     }
     return {
-      engine: this.isIndexedDBActive ? 'IndexedDB \u5927\u5bb9\u91cf\u6a21\u5f0f' : 'LocalStorage \u76f8\u5bb9\u6a21\u5f0f',
+      engine: this.isIndexedDBActive ? 'IndexedDB 大容量模式' : 'LocalStorage 相容模式',
       studentsCount: (this.cache.students || []).length,
       recordsCount: (this.cache.testRecords || []).length,
       usageMB,
       quotaMB
     };
   },
+
   exportRosterToExcel() {
     if (window.AdminPortal && window.AdminPortal.exportRosterExcel) {
       window.AdminPortal.exportRosterExcel();
     }
   }
 };
+
 document.addEventListener('DOMContentLoaded', () => {
   window.FitnessStore.init();
 });

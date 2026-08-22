@@ -1,295 +1,481 @@
-﻿window.FitnessFirebase = {
-  db: null,
+/**
+ * 體適能平台 Firebase 存取層（安全強化版）
+ *
+ * - 使用 Firebase Authentication 的 Email/Password 驗證管理員。
+ * - Firestore REST 路徑固定包含 fitness 資料庫 ID，不碰共用專案的 (default)。
+ * - 私人集合的請求都附帶 Firebase ID Token，並由 Security Rules 驗證角色。
+ * - 學生端只讀取指定學號的一份 student_lookup 文件。
+ */
+import { getApp, getApps, initializeApp } from './vendor/firebase/firebase-app.js';
+import {
+  EmailAuthProvider,
+  browserSessionPersistence,
+  getAuth,
+  getIdTokenResult,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  setPersistence,
+  signInWithEmailAndPassword,
+  signOut,
+  updatePassword
+} from './vendor/firebase/firebase-auth.js';
+
+window.FitnessFirebase = {
+  app: null,
+  auth: null,
   isFirebaseActive: false,
-  configKey: 'FITNESS_FIREBASE_CONFIG',
+  configKey: 'FITNESS_FIREBASE_CONFIG_V2',
+  databaseId: 'fitness',
+  loginAliasDomain: 'fitness-admin.local',
+  functionsRegion: 'asia-east1',
+  currentAdminProfile: null,
+
   defaultConfig: {
-    apiKey: "AIzaSyCzvPwTbxc_Lg7peKRgP0zUrlmI6kkE0b4",
-    authDomain: "seal-management-68465.firebaseapp.com",
-    projectId: "seal-management-68465",
-    storageBucket: "seal-management-68465.firebasestorage.app",
-    messagingSenderId: "933578260928",
-    appId: "1:933578260928:web:fc147363ced2ae69bf0825",
-    measurementId: "G-YB5HD04CK4"
+    apiKey: 'AIzaSyCzvPwTbxc_Lg7peKRgP0zUrlmI6kkE0b4',
+    authDomain: 'seal-management-68465.firebaseapp.com',
+    projectId: 'seal-management-68465',
+    storageBucket: 'seal-management-68465.firebasestorage.app',
+    messagingSenderId: '933578260928',
+    appId: '1:933578260928:web:fc147363ced2ae69bf0825',
+    measurementId: 'G-YB5HD04CK4'
   },
+
   getConfig() {
     try {
       const saved = localStorage.getItem(this.configKey);
-      return saved ? JSON.parse(saved) : this.defaultConfig;
+      return saved ? { ...this.defaultConfig, ...JSON.parse(saved) } : this.defaultConfig;
     } catch (e) {
       return this.defaultConfig;
     }
   },
+
   saveConfig(config) {
     if (!config || !config.apiKey || !config.projectId) {
       localStorage.removeItem(this.configKey);
-      this.isFirebaseActive = false;
-      this.db = null;
       return false;
     }
-    localStorage.setItem(this.configKey, JSON.stringify(config));
-    return this.init();
-  },
-  async ensureFirebaseSDK() {
-    if (typeof firebase !== 'undefined' && firebase.auth) return true;
-    return new Promise((resolve) => {
-      const scriptApp = document.createElement('script');
-      scriptApp.src = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js';
-      scriptApp.onload = () => {
-        const scriptDb = document.createElement('script');
-        scriptDb.src = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js';
-        scriptDb.onload = () => {
-          const scriptAuth = document.createElement('script');
-          scriptAuth.src = 'https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js';
-          scriptAuth.onload = () => resolve(true);
-          scriptAuth.onerror = () => resolve(true);
-          document.head.appendChild(scriptAuth);
-        };
-        scriptDb.onerror = () => resolve(false);
-        document.head.appendChild(scriptDb);
-      };
-      scriptApp.onerror = () => resolve(false);
-      document.head.appendChild(scriptApp);
-    });
-  },
-  init() {
-    const config = this.getConfig();
-    if (!config || !config.apiKey) {
-      console.log('\ud83d\udca1 \u672a\u8a2d\u5b9a Firebase \u91d1\u9470\uff0c\u4f7f\u7528 LocalStorage / IndexedDB \u6a21\u5f0f');
-      this.isFirebaseActive = false;
-      this.db = null;
-      return false;
-    }
-    if (typeof firebase === 'undefined') {
-      console.warn('\u26a0\ufe0f Firebase SDK \u5c1a\u672a\u52a0\u8f09\u5b8c\u6210\uff0c\u5617\u8a66\u767c\u8d77\u81ea\u52d5\u7570\u6b65\u8f09\u5165...');
-      this.ensureFirebaseSDK().then(ok => {
-        if (ok && typeof firebase !== 'undefined') {
-          this.init();
-          if (window.App) window.App.updateFirebaseBadge();
-        }
-      });
-      this.isFirebaseActive = false;
-      this.db = null;
-      return false;
-    }
-    try {
-      const app = !firebase.apps.length ? firebase.initializeApp(config) : firebase.app();
-      if (firebase.auth && !firebase.auth().currentUser) {
-        firebase.auth().signInAnonymously().catch(err => {
-          console.log('Firebase \u975c\u9ed8\u8a8d\u8b49\u63d0\u793a (\u5982\u672a\u555f\u7528\u533f\u540d\u767b\u5165\u53ef\u5ffd\u7565):', err.message);
-        });
-      }
-      try {
-        this._fitnessDb = app.firestore('fitness');
-      } catch (e1) {
-        this._fitnessDb = null;
-      }
-      try {
-        this._defaultDb = firebase.firestore();
-      } catch (e2) {
-        this._defaultDb = null;
-      }
-      this.db = this._fitnessDb || this._defaultDb;
-      this.isFirebaseActive = true;
-      console.log('\ud83d\udd25 \u6210\u529f\u521d\u59cb\u5316 Firebase \u96d9\u91cd\u8cc7\u6599\u5eab\u5099\u4efd\u5f15\u64ce\uff01');
-      return true;
-    } catch (err) {
-      console.warn('\u26a0\ufe0f Firebase \u521d\u59cb\u5316\u5931\u6557\uff0c\u5207\u56de LocalStorage/IndexedDB \u6a21\u5f0f:', err);
-      this.isFirebaseActive = false;
-      this.db = null;
-      return false;
-    }
-  },
-  async _doSaveCollection(dbInstance, key, data) {
-    if (!dbInstance) return false;
-    const jsonStr = JSON.stringify(data);
-    const nowIso = new Date().toISOString();
-    if (jsonStr.length > 700000 && Array.isArray(data)) {
-      const partsNeeded = Math.ceil(jsonStr.length / 600000);
-      const chunkSize = Math.ceil(data.length / partsNeeded);
-      const batch = dbInstance.batch();
-      for (let i = 0; i < partsNeeded; i++) {
-        const chunkData = data.slice(i * chunkSize, (i + 1) * chunkSize);
-        const docRef = dbInstance.collection('fitness_data').doc(`${key}_part_${i + 1}`);
-        batch.set(docRef, {
-          part: i + 1,
-          totalParts: partsNeeded,
-          updatedAt: nowIso,
-          data: chunkData
-        });
-      }
-      const metaRef = dbInstance.collection('fitness_data').doc(key);
-      batch.set(metaRef, {
-        isChunked: true,
-        totalParts: partsNeeded,
-        totalCount: data.length,
-        updatedAt: nowIso
-      });
-      await batch.commit();
-      console.log(`\ud83d\udd25 [${key}] \u81ea\u52d5\u5207\u5206\u6210 ${partsNeeded} \u500b\u5206\u5377\u6587\u6a94\u4e0a\u50b3 Firebase \u6210\u529f\uff01`);
-    } else {
-      await dbInstance.collection('fitness_data').doc(key).set({
-        isChunked: false,
-        updatedAt: nowIso,
-        data: data
-      });
-    }
+    localStorage.setItem(this.configKey, JSON.stringify({
+      ...this.defaultConfig,
+      ...config,
+      authDomain: config.authDomain || `${config.projectId}.firebaseapp.com`
+    }));
     return true;
   },
-  async saveCollectionREST(dbName, key, data) {
+
+  init() {
+    if (this.isFirebaseActive && this.auth) return true;
     const config = this.getConfig();
-    if (!config || !config.projectId || !config.apiKey) return false;
-    const jsonStr = JSON.stringify(data);
-    const nowIso = new Date().toISOString();
-    if (jsonStr.length > 700000 && Array.isArray(data)) {
-      const partsNeeded = Math.ceil(jsonStr.length / 600000);
-      const chunkSize = Math.ceil(data.length / partsNeeded);
-      for (let i = 0; i < partsNeeded; i++) {
-        const chunkData = data.slice(i * chunkSize, (i + 1) * chunkSize);
-        const docId = `${key}_part_${i + 1}`;
-        const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${dbName}/documents/fitness_data/${docId}?key=${config.apiKey}`;
-        const resp = await fetch(url, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fields: {
-              part: { integerValue: i + 1 },
-              totalParts: { integerValue: partsNeeded },
-              updatedAt: { stringValue: nowIso },
-              dataJson: { stringValue: JSON.stringify(chunkData) }
-            }
-          })
-        });
-        if (!resp.ok) {
-          const errJson = await resp.json();
-          throw new Error(errJson.error?.message || 'REST \u4e0a\u50b3\u5931\u6557');
-        }
-      }
-      const metaUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${dbName}/documents/fitness_data/${key}?key=${config.apiKey}`;
-      const metaResp = await fetch(metaUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: {
-            isChunked: { booleanValue: true },
-            totalParts: { integerValue: partsNeeded },
-            totalCount: { integerValue: data.length },
-            updatedAt: { stringValue: nowIso }
-          }
-        })
+    if (!config?.apiKey || !config?.projectId) {
+      this.isFirebaseActive = false;
+      console.warn('Firebase 設定尚未完成，系統停留在安全離線模式。');
+      return false;
+    }
+
+    try {
+      this.app = getApps().length ? getApp() : initializeApp(config);
+      this.auth = getAuth(this.app);
+      setPersistence(this.auth, browserSessionPersistence).catch((err) => {
+        console.warn('無法設定 Firebase 工作階段保存方式。', err);
       });
-      if (!metaResp.ok) {
-        const errJson = await metaResp.json();
-        throw new Error(errJson.error?.message || 'REST Meta \u4e0a\u50b3\u5931\u6557');
-      }
-      console.log(`\ud83d\udd25 REST \u901a\u9053\u76f4\u9023\u6210\u529f\uff01[${key}] \u5df2\u5099\u4efd\u81f3 Firebase \u96f2\u7aef (${dbName})`);
+      this.isFirebaseActive = true;
       return true;
-    } else {
-      const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${dbName}/documents/fitness_data/${key}?key=${config.apiKey}`;
-      const resp = await fetch(url, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: {
-            isChunked: { booleanValue: false },
-            updatedAt: { stringValue: nowIso },
-            dataJson: { stringValue: jsonStr }
-          }
-        })
-      });
-      if (!resp.ok) {
-        const errJson = await resp.json();
-        throw new Error(errJson.error?.message || 'REST API \u5beb\u5165\u5931\u6557');
-      }
-      console.log(`\ud83d\udd25 REST \u901a\u9053\u76f4\u9023\u6210\u529f\uff01[${key}] \u5df2\u5099\u4efd\u81f3 Firebase \u96f2\u7aef (${dbName})`);
-      return true;
+    } catch (err) {
+      console.warn('Firebase Authentication 初始化失敗。', err);
+      this.isFirebaseActive = false;
+      this.auth = null;
+      return false;
     }
   },
-  async loadCollectionREST(dbName, key) {
-    const config = this.getConfig();
-    if (!config || !config.projectId || !config.apiKey) return null;
-    try {
-      const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${dbName}/documents/fitness_data/${key}?key=${config.apiKey}`;
-      const resp = await fetch(url);
-      if (!resp.ok) return null;
-      const json = await resp.json();
-      const fields = json.fields || {};
-      if (fields.isChunked && fields.isChunked.booleanValue) {
-        const totalParts = fields.totalParts ? Number(fields.totalParts.integerValue || 0) : 0;
-        let allData = [];
-        for (let i = 1; i <= totalParts; i++) {
-          const partUrl = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${dbName}/documents/fitness_data/${key}_part_${i}?key=${config.apiKey}`;
-          const partResp = await fetch(partUrl);
-          if (partResp.ok) {
-            const partJson = await partResp.json();
-            const partStr = partJson.fields?.dataJson?.stringValue;
-            if (partStr) {
-              allData = allData.concat(JSON.parse(partStr));
-            }
-          }
-        }
-        return allData;
-      } else if (fields.dataJson && fields.dataJson.stringValue) {
-        return JSON.parse(fields.dataJson.stringValue);
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+
+  get databaseRoot() {
+    const projectId = encodeURIComponent(this.getConfig().projectId);
+    const databaseId = encodeURIComponent(this.databaseId);
+    return `https://firestore.googleapis.com/v1/projects/${projectId}/databases/${databaseId}/documents`;
   },
-  async saveCollection(key, data) {
-    if (!this.isFirebaseActive) return false;
-    try {
-      return await this._doSaveCollection(this.db, key, data);
-    } catch (e1) {
-      console.warn(`SDK \u4e3b\u9023\u7dda\u672a\u901a\u904e\uff0c\u81ea\u52d5\u555f\u52d5 HTTP REST \u901a\u9053 (fitness)...`, e1);
+
+  _path(path) {
+    return String(path || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  },
+
+  _documentName(path) {
+    return `${this.databaseRoot.replace('https://firestore.googleapis.com/v1/', '')}/${this._path(path)}`;
+  },
+
+  async _headers(requireAdmin = false) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (requireAdmin) {
+      await this.requireAdmin();
+      headers.Authorization = `Bearer ${await this.auth.currentUser.getIdToken()}`;
+    }
+    return headers;
+  },
+
+  async _request(url, options = {}, requireAdmin = false) {
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...(await this._headers(requireAdmin)), ...(options.headers || {}) }
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      let detail = '';
       try {
-        return await this.saveCollectionREST('fitness', key, data);
-      } catch (e2) {
-        try {
-          return await this.saveCollectionREST('(default)', key, data);
-        } catch (e3) {
-          throw e1;
-        }
+        detail = (await response.json())?.error?.message || '';
+      } catch (e) {
+        detail = await response.text().catch(() => '');
       }
+      const error = new Error(detail || `Firestore 請求失敗 (${response.status})`);
+      error.status = response.status;
+      throw error;
     }
+    return response.status === 204 ? null : response.json();
   },
-  async saveChunkedData(key, data) {
-    return await this.saveCollection(key, data);
+
+  _toValue(value) {
+    if (value === null || value === undefined) return { nullValue: null };
+    if (typeof value === 'string') return { stringValue: value };
+    if (typeof value === 'boolean') return { booleanValue: value };
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) return { nullValue: null };
+      return Number.isInteger(value)
+        ? { integerValue: String(value) }
+        : { doubleValue: value };
+    }
+    if (Array.isArray(value)) {
+      return { arrayValue: { values: value.map((item) => this._toValue(item)) } };
+    }
+    if (typeof value === 'object') {
+      const fields = {};
+      Object.entries(value).forEach(([key, item]) => {
+        if (item !== undefined) fields[key] = this._toValue(item);
+      });
+      return { mapValue: { fields } };
+    }
+    return { stringValue: String(value) };
   },
-  async _doLoadCollection(dbInstance, key) {
-    if (!dbInstance) return null;
-    const doc = await dbInstance.collection('fitness_data').doc(key).get();
-    if (!doc.exists) return null;
-    const meta = doc.data();
-    if (meta.isChunked && meta.totalParts) {
+
+  _fromValue(value) {
+    if (!value || 'nullValue' in value) return null;
+    if ('stringValue' in value) return value.stringValue;
+    if ('booleanValue' in value) return value.booleanValue;
+    if ('integerValue' in value) return Number(value.integerValue);
+    if ('doubleValue' in value) return Number(value.doubleValue);
+    if ('timestampValue' in value) return value.timestampValue;
+    if ('arrayValue' in value) return (value.arrayValue.values || []).map((item) => this._fromValue(item));
+    if ('mapValue' in value) return this._decodeFields(value.mapValue.fields || {});
+    return null;
+  },
+
+  _encodeFields(data) {
+    const fields = {};
+    Object.entries(data || {}).forEach(([key, value]) => {
+      if (value !== undefined) fields[key] = this._toValue(value);
+    });
+    return fields;
+  },
+
+  _decodeFields(fields) {
+    const data = {};
+    Object.entries(fields || {}).forEach(([key, value]) => {
+      data[key] = this._fromValue(value);
+    });
+    return data;
+  },
+
+  async _getDocument(path, requireAdmin = false) {
+    const result = await this._request(`${this.databaseRoot}/${this._path(path)}`, {}, requireAdmin);
+    return result ? this._decodeFields(result.fields || {}) : null;
+  },
+
+  async _listDocuments(collectionPath) {
+    await this.requireAdmin();
+    const documents = [];
+    let pageToken = '';
+    do {
+      const query = new URLSearchParams({ pageSize: '1000' });
+      if (pageToken) query.set('pageToken', pageToken);
+      const result = await this._request(
+        `${this.databaseRoot}/${this._path(collectionPath)}?${query}`,
+        {},
+        true
+      );
+      documents.push(...(result?.documents || []).map((item) => ({
+        id: decodeURIComponent(item.name.split('/').pop()),
+        data: this._decodeFields(item.fields || {})
+      })));
+      pageToken = result?.nextPageToken || '';
+    } while (pageToken);
+    return documents;
+  },
+
+  async _commitWrites(operations) {
+    if (!operations.length) return true;
+    const writes = operations.map((operation) => {
+      const name = this._documentName(operation.path);
+      if (operation.type === 'delete') return { delete: name };
+      return { update: { name, fields: this._encodeFields(operation.data) } };
+    });
+    await this._request(`${this.databaseRoot}:commit`, {
+      method: 'POST',
+      body: JSON.stringify({ writes })
+    }, true);
+    return true;
+  },
+
+  onAuthStateChanged(callback) {
+    if (!this.auth) this.init();
+    if (!this.auth) {
+      callback(null);
+      return () => {};
+    }
+    return onAuthStateChanged(this.auth, callback);
+  },
+
+  async getAuthorizedAdmin(user = this.auth?.currentUser, forceRefresh = false) {
+    if (!user) return null;
+    const token = await getIdTokenResult(user, forceRefresh);
+    const role = token.claims.role;
+    const isAdmin = token.claims.admin === true || role === 'super_admin' || role === 'staff';
+    if (!isAdmin) return null;
+    const aliasSuffix = `@${this.loginAliasDomain}`;
+    const visibleAccount = (user.email || '').endsWith(aliasSuffix)
+      ? user.email.slice(0, -aliasSuffix.length)
+      : (user.email || '');
+    return {
+      uid: user.uid,
+      email: user.email || '',
+      username: visibleAccount,
+      name: user.displayName || token.claims.name || visibleAccount || '管理員',
+      role: role === 'staff' ? 'staff' : 'super_admin'
+    };
+  },
+
+  async callAdminAccounts(action, payload = {}) {
+    const profile = await this.requireAdmin();
+    if (profile.role !== 'super_admin') throw new Error('只有系統管理員可以管理白名單');
+    const config = this.getConfig();
+    const endpoint = `https://${this.functionsRegion}-${config.projectId}.cloudfunctions.net/adminAccounts`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${await this.auth.currentUser.getIdToken()}`
+      },
+      body: JSON.stringify({ data: { action, ...payload } })
+    });
+    let body = null;
+    try {
+      body = await response.json();
+    } catch (error) {
+      throw new Error(`白名單服務回應格式錯誤 (${response.status})`);
+    }
+    if (!response.ok || body?.error) {
+      const message = body?.error?.message
+        || (response.status === 404 ? '白名單服務尚未部署，請先部署 Cloud Functions' : '')
+        || `白名單服務暫時無法使用 (${response.status})`;
+      const error = new Error(message);
+      error.code = body?.error?.status || response.status;
+      throw error;
+    }
+    return body?.result ?? body?.data ?? body?.response ?? null;
+  },
+
+  async listAdminAccounts() {
+    const result = await this.callAdminAccounts('list');
+    return Array.isArray(result?.accounts) ? result.accounts : [];
+  },
+
+  async saveAdminAccount(account) {
+    const result = await this.callAdminAccounts('save', account);
+    return result?.account || null;
+  },
+
+  async signInAdmin(account, password) {
+    if (!this.auth && !this.init()) throw new Error('Firebase Authentication 尚未啟用');
+    const normalizedAccount = String(account || '').trim().toLowerCase();
+    const email = normalizedAccount.includes('@')
+      ? normalizedAccount
+      : `${normalizedAccount}@${this.loginAliasDomain}`;
+    const credential = await signInWithEmailAndPassword(this.auth, email, password);
+    const profile = await this.getAuthorizedAdmin(credential.user, true);
+    if (!profile) {
+      await signOut(this.auth);
+      throw new Error('此帳號尚未被授予體適能管理權限');
+    }
+    this.currentAdminProfile = profile;
+    return profile;
+  },
+
+  async signOut() {
+    this.currentAdminProfile = null;
+    if (this.auth) await signOut(this.auth);
+  },
+
+  async changeCurrentPassword(currentPassword, newPassword) {
+    const user = this.auth?.currentUser;
+    if (!user?.email) throw new Error('請重新登入後再修改密碼');
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+    return true;
+  },
+
+  async requireAdmin() {
+    const profile = await this.getAuthorizedAdmin(this.auth?.currentUser);
+    if (!profile) throw new Error('需要已授權的 Firebase 管理員身分');
+    this.currentAdminProfile = profile;
+    return profile;
+  },
+
+  async _loadDocumentData(key, requireAdmin = true) {
+    const meta = await this._getDocument(`fitness_data/${key}`, requireAdmin);
+    if (!meta) return null;
+    if (meta.isChunked && Number(meta.totalParts) > 0) {
       let allData = [];
-      for (let i = 1; i <= meta.totalParts; i++) {
-        const partDoc = await dbInstance.collection('fitness_data').doc(`${key}_part_${i}`).get();
-        if (partDoc.exists && partDoc.data() && partDoc.data().data) {
-          allData = allData.concat(partDoc.data().data);
-        }
+      for (let i = 1; i <= Number(meta.totalParts); i += 1) {
+        const partData = await this._getDocument(`fitness_data/${key}_part_${i}`, requireAdmin);
+        if (Array.isArray(partData?.data)) allData = allData.concat(partData.data);
       }
       return allData;
     }
-    return meta.data || null;
+    return meta.data ?? null;
   },
+
+  async loadPublicAnnouncements() {
+    if (!this.isFirebaseActive && !this.init()) return null;
+    try {
+      return await this._loadDocumentData('announcements', false);
+    } catch (err) {
+      console.warn('公開公告載入失敗。', err);
+      return null;
+    }
+  },
+
+  async loadStudentLookup(studentId) {
+    const normalizedId = window.SafeUI?.studentId(studentId) || '';
+    if (!normalizedId) return null;
+    if (!this.isFirebaseActive && !this.init()) return null;
+    try {
+      return await this._getDocument(`student_lookup/${normalizedId}`, false);
+    } catch (err) {
+      console.warn('學生單筆查詢失敗。', err);
+      return null;
+    }
+  },
+
   async loadCollection(key) {
-    if (!this.isFirebaseActive) return null;
-    try {
-      const res = await this._doLoadCollection(this.db, key);
-      if (res !== null) return res;
-    } catch (e1) {}
-    try {
-      const restFitness = await this.loadCollectionREST('fitness', key);
-      if (restFitness !== null) return restFitness;
-    } catch (e2) {}
-    try {
-      const restDefault = await this.loadCollectionREST('(default)', key);
-      if (restDefault !== null) return restDefault;
-    } catch (e3) {}
-    return null;
+    if (key === 'announcements') return this.loadPublicAnnouncements();
+    await this.requireAdmin();
+    return this._loadDocumentData(key, true);
+  },
+
+  async _saveCollection(key, data) {
+    const jsonStr = JSON.stringify(data);
+    const nowIso = new Date().toISOString();
+    const oldMeta = await this._getDocument(`fitness_data/${key}`, true);
+    const oldParts = Number(oldMeta?.totalParts || 0);
+    const parts = [];
+
+    if (jsonStr.length > 700000 && Array.isArray(data)) {
+      const partsNeeded = Math.ceil(jsonStr.length / 600000);
+      const chunkSize = Math.ceil(data.length / partsNeeded);
+      for (let i = 0; i < partsNeeded; i += 1) {
+        parts.push(data.slice(i * chunkSize, (i + 1) * chunkSize));
+      }
+    }
+
+    const operations = [];
+    if (parts.length) {
+      parts.forEach((part, index) => {
+        operations.push({
+          type: 'set',
+          path: `fitness_data/${key}_part_${index + 1}`,
+          data: { part: index + 1, totalParts: parts.length, updatedAt: nowIso, data: part }
+        });
+      });
+      operations.push({
+        type: 'set',
+        path: `fitness_data/${key}`,
+        data: { isChunked: true, totalParts: parts.length, totalCount: data.length, updatedAt: nowIso }
+      });
+    } else {
+      operations.push({
+        type: 'set',
+        path: `fitness_data/${key}`,
+        data: { isChunked: false, totalParts: 0, updatedAt: nowIso, data }
+      });
+    }
+    for (let i = parts.length + 1; i <= oldParts; i += 1) {
+      operations.push({ type: 'delete', path: `fitness_data/${key}_part_${i}` });
+    }
+    for (let start = 0; start < operations.length; start += 400) {
+      await this._commitWrites(operations.slice(start, start + 400));
+    }
+    return true;
+  },
+
+  async saveCollection(key, data) {
+    await this.requireAdmin();
+    return this._saveCollection(key, data);
+  },
+
+  async saveChunkedData(key, data) {
+    return this.saveCollection(key, data);
+  },
+
+  async publishStudentLookups(students, records) {
+    await this.requireAdmin();
+    const recordMap = new Map();
+    (records || []).forEach((record) => {
+      const id = window.SafeUI?.studentId(record.studentId);
+      if (!id) return;
+      if (!recordMap.has(id)) recordMap.set(id, []);
+      recordMap.get(id).push(record);
+    });
+
+    const entries = (students || []).map((student) => {
+      const id = window.SafeUI?.studentId(student.studentId);
+      if (!id) return null;
+      const publicStudent = {
+        studentId: id,
+        name: student.name || '',
+        className: student.className || '',
+        enrollYear: student.enrollYear || '',
+        rosterStatus: student.rosterStatus || '',
+        status: student.status || '',
+        passCount: Number(student.passCount || 0),
+        deficitCount: Number(student.deficitCount || 0),
+        semesters: student.semesters || {},
+        isTransfer: Number(student.isTransfer || 0),
+        transferCredit: Number(student.transferCredit || 0),
+        isExemptAthleteOrDisabled: Number(student.isExemptAthleteOrDisabled || 0),
+        exemptCredit: Number(student.exemptCredit || 0),
+        specialIdentity: student.specialIdentity || '',
+        identityStatus: student.identityStatus || '',
+        otherNotes: student.otherNotes || '',
+        reason: student.reason || '',
+        updatedAt: student.updatedAt || ''
+      };
+      return [id, {
+        student: publicStudent,
+        records: recordMap.get(id) || [],
+        publishedAt: new Date().toISOString()
+      }];
+    }).filter(Boolean);
+
+    const existing = await this._listDocuments('student_lookup');
+    const activeIds = new Set(entries.map(([id]) => id));
+    const operations = entries.map(([id, data]) => ({ type: 'set', path: `student_lookup/${id}`, data }));
+    existing.forEach((lookupDoc) => {
+      if (!activeIds.has(lookupDoc.id)) {
+        operations.push({ type: 'delete', path: `student_lookup/${lookupDoc.id}` });
+      }
+    });
+
+    for (let start = 0; start < operations.length; start += 400) {
+      await this._commitWrites(operations.slice(start, start + 400));
+    }
+    return { success: true, count: entries.length };
   }
 };
-document.addEventListener('DOMContentLoaded', () => {
-  window.FitnessFirebase.init();
-});
+
+window.FitnessFirebase.init();

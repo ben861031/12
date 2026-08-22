@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
@@ -7,11 +7,8 @@
  
   <!-- Tailwind CSS & SheetJS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase SDKs (CDN) -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
   <!-- 企業級行政管理系統樣式表 -->
   <link rel="stylesheet" href="css/custom.css">
@@ -22,7 +19,8 @@
   <div id="root"></div>
 
   <!-- 系統核心邏輯與組件庫 -->
-  <script src="js/firebase-config.js"></script>
+  <script src="js/security-utils.js"></script>
+  <script type="module" src="js/firebase-config.js"></script>
   <script src="js/store.js"></script>
   <script src="js/excel-importer.js"></script>
   <script src="js/ui-templates.js"></script>
