@@ -201,8 +201,8 @@ window.StudentPortal = {
     const e = window.SafeUI.escape.bind(window.SafeUI);
     const reqPass = window.FitnessStore.settings.requiredPassCount || 2;
     const isPassed = student.status === '\u901a\u904e';
-    const isExempt = (Number(student.isExemptAthleteOrDisabled) > 0) || (Number(student.exemptCredit) > 0);
     const passCount = Number(student.passCount || 0);
+    const passedByAdministrativeReview = isPassed && passCount < reqPass;
     const deficitCount = isPassed ? 0 : Math.max(0, reqPass - passCount);
     const progressPercent = isPassed ? 100 : Math.min(100, Math.round((passCount / reqPass) * 100));
     const maskedName = this.maskStudentName(student.name);
@@ -316,7 +316,7 @@ window.StudentPortal = {
             <div class="flex items-center justify-between mb-2.5">
               <span class="text-sm font-bold text-slate-500">\u7562\u696d\u9580\u6abb\u7d2f\u8a08\u9032\u5ea6</span>
               <span class="text-base sm:text-lg font-bold font-mono ${isPassed ? 'text-emerald-600' : 'text-rose-600'}">
-                ${isExempt ? '\u5df2\u901a\u904e' : `${progressPercent}%`}
+                ${passedByAdministrativeReview ? '\u5df2\u901a\u904e' : `${progressPercent}%`}
               </span>
             </div>
             <div class="text-lg sm:text-xl font-bold text-slate-900 mb-3">

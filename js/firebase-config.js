@@ -379,6 +379,12 @@ window.FitnessFirebase = {
   },
   async publishStudentLookups(students, records) {
     await this.requireAdmin();
+    const maskPublicName = (value) => {
+      const name = String(value || '').trim();
+      if (name.length <= 1) return name;
+      if (name.length === 2) return `${name[0]}\u3007`;
+      return `${name[0]}\u3007${name.slice(2)}`;
+    };
     const recordMap = new Map();
     (records || []).forEach((record) => {
       const id = window.SafeUI?.studentId(record.studentId);
@@ -405,12 +411,18 @@ window.FitnessFirebase = {
         });
       });
       return Array.from(recordsBySemester.values()).map(record => {
-        const publicRecord = { ...record, studentId: currentId };
-        delete publicRecord.carriedFromStudentId;
-        delete publicRecord.carriedToStudentId;
-        delete publicRecord.carryoverId;
-        delete publicRecord.isCarriedRecord;
-        return publicRecord;
+        const scores = record?.scores || {};
+        return {
+          studentId: currentId,
+          semester: String(record?.semester || '').trim(),
+          isPassed: record?.isPassed === true || ['\u5408\u683c', '\u514d\u6e2c'].includes(String(record?.status || '').trim()),
+          scores: {
+            sitAndReach: scores.sitAndReach ?? '-',
+            standingLongJump: scores.standingLongJump ?? '-',
+            sitUps: scores.sitUps ?? '-',
+            cardio: scores.cardio ?? '-'
+          }
+        };
       });
     };
     const entries = (students || []).map((student) => {
@@ -418,23 +430,14 @@ window.FitnessFirebase = {
       if (!id || student.lookupDisabled === true) return null;
       const publicStudent = {
         studentId: id,
-        name: student.name || '',
+        name: maskPublicName(student.name),
         className: student.className || '',
         enrollYear: student.enrollYear || '',
-        rosterStatus: student.rosterStatus || '',
         status: student.status || '',
         passCount: Number(student.passCount || 0),
-        deficitCount: Number(student.deficitCount || 0),
         semesters: student.semesters || {},
         isTransfer: Number(student.isTransfer || 0),
-        transferCredit: Number(student.transferCredit || 0),
-        isExemptAthleteOrDisabled: Number(student.isExemptAthleteOrDisabled || 0),
-        exemptCredit: Number(student.exemptCredit || 0),
-        specialIdentity: student.specialIdentity || '',
-        identityStatus: student.identityStatus || '',
-        otherNotes: student.otherNotes || '',
-        reason: student.reason || '',
-        updatedAt: student.updatedAt || ''
+        transferCredit: Number(student.transferCredit || 0)
       };
       return [id, {
         student: publicStudent,
