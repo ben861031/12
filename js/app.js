@@ -2,6 +2,7 @@ window.App = {
   currentTab: 'student', // 'student' | 'admin'
   pendingScanResult: null,
   pendingSemester: '1122',
+  pendingImportSimulation: null,
   init() {
     this.bindGlobalEvents();
     this.checkURLParams();
@@ -161,18 +162,13 @@ window.App = {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      this.showToast('\u6b63\u5728\u89e3\u6790\u4e26\u532f\u5165\u5b78\u7c4d Excel \u8cc7\u6599...', 'info');
-      const res = await window.FitnessImporter.importRosterExcel(file);
+      this.showToast('\u6b63\u5728\u9032\u884c\u5b78\u751f\u540d\u518a\u532f\u5165\u524d\u6a21\u64ec\u6aa2\u67e5...', 'info');
+      const scanResult = await window.FitnessImporter.scanRosterExcel(file);
       this.closeRosterModal();
-      window.FitnessStore.addAuditLog({
-        action: '\u532f\u5165\u5b78\u751f\u540d\u518a',
-        studentId: 'MULTI',
-        details: `\u532f\u5165\u6a94\u6848\u300c${file.name}\u300d\uff1b\u65b0\u589e ${res.addedCount} \u4eba\u3001\u66f4\u65b0 ${res.updatedCount} \u4eba\u3001\u8f49\u70ba\u975e\u5728\u5b78 ${res.archivedCount} \u4eba`
-      });
-      this.showToast(`\u5b78\u7c4d\u532f\u5165\u6210\u529f\uff01\u65b0\u589e ${res.addedCount} \u4eba\uff0c\u66f4\u65b0 ${res.updatedCount} \u4eba\uff0c\u8f49\u70ba\u975e\u5728\u5b78 ${res.archivedCount} \u4eba`, 'success');
-      window.AdminPortal.renderCurrentView();
+      this.pendingImportSimulation = { kind: 'roster', fileName: file.name, scanResult, semester: '' };
+      this.openImportSimulationModal(this.pendingImportSimulation);
     } catch (err) {
-      this.showToast(`\u532f\u5165\u5931\u6557\uff1a${err}`, 'danger');
+      this.showToast(`\u6a21\u64ec\u6aa2\u67e5\u5931\u6557\uff1a${err}`, 'danger');
     } finally {
       e.target.value = '';
     }
@@ -183,25 +179,129 @@ window.App = {
     const semesterInput = document.getElementById('importSemesterInput')?.value.trim();
     this.pendingSemester = semesterInput;
     try {
-      this.showToast('\u6b63\u5728\u6383\u63cf Excel \u4e26\u6bd4\u5c0d\u7cfb\u7d71\u5b78\u7c4d...', 'info');
+      this.showToast('\u6b63\u5728\u9032\u884c\u6210\u7e3e\u532f\u5165\u524d\u6a21\u64ec\u6aa2\u67e5...', 'info');
       const scanResult = await window.FitnessImporter.scanTestExcel(file, semesterInput);
       this.closeTestImportModal();
-      if (scanResult.mismatches && scanResult.mismatches.length > 0) {
-        this.pendingScanResult = scanResult;
-        this.openImportMismatchModal(scanResult);
-      } else if (scanResult.scoreConflicts && scanResult.scoreConflicts.length > 0) {
-        this.pendingScanResult = scanResult;
-        this.openScoreConflictModal(scanResult);
-      } else if (scanResult.logicConflicts && scanResult.logicConflicts.length > 0) {
-        this.pendingScanResult = scanResult;
-        this.openLogicConflictModal(scanResult);
-      } else {
-        this.executeImport(scanResult, semesterInput, 'keep_db', 'keep_excel');
-      }
+      this.pendingImportSimulation = { kind: 'test', fileName: file.name, scanResult, semester: semesterInput };
+      this.openImportSimulationModal(this.pendingImportSimulation);
     } catch (err) {
       this.showToast(`Excel \u8b80\u53d6\u5931\u6557\uff1a${err}`, 'danger');
     } finally {
       e.target.value = '';
+    }
+  },
+  openImportSimulationModal(pending) {
+    const e = window.SafeUI.escape.bind(window.SafeUI);
+    const { kind, fileName, scanResult, semester } = pending;
+    const simulation = scanResult.simulation || {};
+    const isRoster = kind === 'roster';
+    const issues = Array.isArray(simulation.issues) ? simulation.issues : [];
+    const dangerCount = issues.filter(issue => issue.level === 'danger').length;
+    const warningCount = issues.filter(issue => issue.level !== 'danger').length;
+    const affectedSemesters = (simulation.affectedSemesters || []).filter(Boolean).join('\u3001');
+    const title = document.getElementById('importSimulationTitle');
+    const meta = document.getElementById('importSimulationMeta');
+    const status = document.getElementById('importSimulationStatus');
+    const stats = document.getElementById('importSimulationStats');
+    const issueWrap = document.getElementById('importSimulationIssueWrap');
+    const issueBody = document.getElementById('importSimulationIssueBody');
+    const issueFootnote = document.getElementById('importSimulationIssueFootnote');
+    if (title) title.textContent = isRoster ? '\u5b78\u751f\u540d\u518a\u532f\u5165\u524d\u6a21\u64ec\u6aa2\u67e5' : '\u9ad4\u9069\u80fd\u6210\u7e3e\u532f\u5165\u524d\u6a21\u64ec\u6aa2\u67e5';
+    if (meta) {
+      meta.textContent = `${fileName || '\u672a\u547d\u540d\u6a94\u6848'}${semester ? ` \u00b7 \u6b78\u6a94\u5b78\u671f ${semester}` : ''}${affectedSemesters && !semester ? ` \u00b7 \u6d89\u53ca\u5b78\u671f ${affectedSemesters}` : ''}`;
+    }
+    if (status) {
+      status.className = `rounded-xl border px-4 py-3 text-sm font-bold ${dangerCount > 0
+        ? 'border-rose-200 bg-rose-50 text-rose-700'
+        : warningCount > 0
+          ? 'border-amber-200 bg-amber-50 text-amber-700'
+          : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`;
+      status.textContent = dangerCount > 0
+        ? `\u6a21\u64ec\u5b8c\u6210\uff1a\u767c\u73fe ${dangerCount} \u9805\u9700\u7279\u5225\u78ba\u8a8d\u3001${warningCount} \u9805\u63d0\u9192\uff1b\u76ee\u524d\u5c1a\u672a\u5beb\u5165\u4efb\u4f55\u8cc7\u6599\u3002`
+        : warningCount > 0
+          ? `\u6a21\u64ec\u5b8c\u6210\uff1a\u6709 ${warningCount} \u9805\u63d0\u9192\uff1b\u76ee\u524d\u5c1a\u672a\u5beb\u5165\u4efb\u4f55\u8cc7\u6599\u3002`
+          : '\u6a21\u64ec\u5b8c\u6210\uff1a\u672a\u767c\u73fe\u7570\u5e38\uff1b\u76ee\u524d\u5c1a\u672a\u5beb\u5165\u4efb\u4f55\u8cc7\u6599\u3002';
+    }
+    const statItems = isRoster
+      ? [
+          { label: '\u6709\u6548\u8cc7\u6599', value: simulation.validRows || 0, tone: 'blue' },
+          { label: '\u9810\u8a08\u65b0\u589e\u5b78\u751f', value: simulation.addedCount || 0, tone: 'emerald' },
+          { label: '\u9810\u8a08\u66f4\u65b0\u5b78\u751f', value: simulation.updatedCount || 0, tone: 'slate' },
+          { label: '\u8f49\u70ba\u975e\u5728\u5b78', value: simulation.archivedCount || 0, tone: 'amber' },
+          { label: '\u7565\u904e\u8cc7\u6599', value: simulation.skippedCount || 0, tone: 'rose' }
+        ]
+      : [
+          { label: '\u6709\u6548\u8cc7\u6599', value: simulation.validRows || 0, tone: 'blue' },
+          { label: '\u9810\u8a08\u65b0\u589e\u5b78\u751f', value: simulation.addedCount || 0, tone: 'emerald' },
+          { label: '\u9810\u8a08\u66f4\u65b0\u5b78\u751f', value: simulation.updatedCount || 0, tone: 'slate' },
+          { label: '\u65b0\u589e\u6210\u7e3e\u7d00\u9304', value: simulation.newRecordCount || 0, tone: 'emerald' },
+          { label: '\u8986\u5beb\u65e2\u6709\u6210\u7e3e', value: simulation.overwriteCount || 0, tone: 'amber' },
+          { label: '\u7565\u904e\u8cc7\u6599', value: simulation.skippedCount || 0, tone: 'rose' }
+    ];
+    if (stats) {
+      stats.className = `grid grid-cols-2 sm:grid-cols-3 ${isRoster ? 'lg:grid-cols-5' : 'lg:grid-cols-6'} gap-2.5`;
+      const toneClasses = {
+        blue: 'border-blue-200 bg-blue-50 text-blue-700',
+        emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        slate: 'border-slate-200 bg-slate-50 text-slate-700',
+        amber: 'border-amber-200 bg-amber-50 text-amber-700',
+        rose: 'border-rose-200 bg-rose-50 text-rose-700'
+      };
+      stats.innerHTML = statItems.map(item => `
+        <div class="rounded-xl border p-3 ${toneClasses[item.tone]}">
+          <div class="text-[11px] font-bold opacity-75">${e(item.label)}</div>
+          <div class="mt-1 text-2xl font-black tabular-nums">${e(item.value)}</div>
+        </div>
+      `).join('');
+    }
+    if (issueWrap) issueWrap.classList.toggle('hidden', issues.length === 0);
+    if (issueBody) {
+      issueBody.innerHTML = issues.slice(0, 100).map(issue => `
+        <tr class="border-b border-slate-100 last:border-0">
+          <td class="px-3 py-2 text-center font-mono text-xs text-slate-500">${e(issue.rowNum ?? '-')}</td>
+          <td class="px-3 py-2 font-mono text-xs font-bold text-slate-700">${e(issue.studentId || '-')}</td>
+          <td class="px-3 py-2"><span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${issue.level === 'danger' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">${e(issue.type)}</span></td>
+          <td class="px-3 py-2 text-xs text-slate-600">${e(issue.detail)}</td>
+        </tr>
+      `).join('');
+    }
+    if (issueFootnote) {
+      issueFootnote.textContent = issues.length > 100 ? `\u756b\u9762\u5148\u986f\u793a\u524d 100 \u9805\uff0c\u5171 ${issues.length} \u9805\u3002` : `\u5171 ${issues.length} \u9805\u3002`;
+    }
+    document.getElementById('importSimulationModal')?.classList.remove('hidden');
+  },
+  cancelImportSimulation() {
+    document.getElementById('importSimulationModal')?.classList.add('hidden');
+    this.pendingImportSimulation = null;
+    this.pendingScanResult = null;
+    this.showToast('\u5df2\u53d6\u6d88\u532f\u5165\uff1b\u7cfb\u7d71\u6c92\u6709\u5beb\u5165\u4efb\u4f55\u8cc7\u6599', 'info');
+  },
+  confirmImportSimulation() {
+    const pending = this.pendingImportSimulation;
+    if (!pending?.scanResult) return;
+    document.getElementById('importSimulationModal')?.classList.add('hidden');
+    if (pending.kind === 'roster') {
+      const res = window.FitnessImporter.applyRosterImport(pending.scanResult, pending.fileName);
+      const correctionNote = pending.scanResult.simulation?.identityColumnsAutoCorrected ? '\uff1b\u5df2\u81ea\u52d5\u6821\u6b63\u59d3\u540d\uff0f\u73ed\u7d1a\u6b04\u4f4d' : '';
+      this.showToast(`\u5b78\u7c4d\u532f\u5165\u6210\u529f\uff01\u65b0\u589e ${res.addedCount} \u4eba\uff0c\u66f4\u65b0 ${res.updatedCount} \u4eba\uff0c\u8f49\u70ba\u975e\u5728\u5b78 ${res.archivedCount} \u4eba${correctionNote}`, 'success');
+      this.pendingImportSimulation = null;
+      window.AdminPortal.renderCurrentView();
+      return;
+    }
+    this.pendingScanResult = pending.scanResult;
+    this.pendingSemester = pending.semester;
+    this.pendingImportSimulation = null;
+    this.continueTestImportChecks(pending.scanResult);
+  },
+  continueTestImportChecks(scanResult) {
+    if (scanResult.mismatches?.length > 0) {
+      this.openImportMismatchModal(scanResult);
+    } else if (scanResult.scoreConflicts?.length > 0) {
+      this.openScoreConflictModal(scanResult);
+    } else if (scanResult.logicConflicts?.length > 0) {
+      this.openLogicConflictModal(scanResult);
+    } else {
+      this.executeImport(scanResult, this.pendingSemester, 'keep_db', 'keep_excel');
     }
   },
   openImportMismatchModal(scanResult) {
@@ -243,8 +343,10 @@ window.App = {
     if (modal) modal.classList.add('hidden');
     if (this.pendingScanResult.scoreConflicts && this.pendingScanResult.scoreConflicts.length > 0) {
       this.openScoreConflictModal(this.pendingScanResult);
+    } else if (this.pendingScanResult.logicConflicts && this.pendingScanResult.logicConflicts.length > 0) {
+      this.openLogicConflictModal(this.pendingScanResult);
     } else {
-      this.executeImport(this.pendingScanResult, this.pendingSemester, 'keep_db');
+      this.executeImport(this.pendingScanResult, this.pendingSemester, 'keep_db', 'keep_excel');
       this.pendingScanResult = null;
     }
   },
@@ -327,13 +429,17 @@ window.App = {
     const correctionNote = scanResult.identityColumnsAutoCorrected
       ? '\uff1b\u7cfb\u7d71\u5df2\u81ea\u52d5\u6821\u6b63\u59d3\u540d\uff0f\u73ed\u7d1a\u6b04\u4f4d'
       : '';
-    const semesters = semester || [...new Set((scanResult.rows || []).map(row => row.semester).filter(Boolean))].join('\u3001') || '\u4f9d\u6a94\u6848\u5167\u5bb9';
+    const semesters = semester
+      || (scanResult.simulation?.affectedSemesters || []).filter(Boolean).join('\u3001')
+      || '\u4f9d\u6a94\u6848\u5167\u5bb9';
     window.FitnessStore.addAuditLog({
       action: '\u532f\u5165\u9ad4\u9069\u80fd\u6210\u7e3e',
       studentId: 'MULTI',
       details: `\u6b78\u6a94\u5b78\u671f\uff1a${semesters}\uff1b\u66f4\u65b0 ${res.updatedCount} \u4f4d\u5b78\u751f\u3001\u65b0\u589e ${res.addedStudentCount} \u4eba${correctionNote}`
     });
     this.showToast(`\u9ad4\u9069\u80fd\u6210\u7e3e\u532f\u5165\u6210\u529f\uff01\u5171\u66f4\u65b0 ${res.updatedCount} \u4f4d\u5b78\u751f\u72c0\u614b (\u65b0\u589e ${res.addedStudentCount} \u4eba)${correctionNote}`, 'success');
+    this.pendingScanResult = null;
+    this.pendingImportSimulation = null;
     window.AdminPortal.renderCurrentView();
   },
   clearAllData() {

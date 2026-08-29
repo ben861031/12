@@ -1147,6 +1147,7 @@
         <span>\u5305\u542b\u6b04\u4f4d\uff1a\u5b78\u865f\u3001\u73ed\u7d1a\u3001\u59d3\u540d(\u5168\u540d)\u3002</span>
         <button onclick="App.downloadRosterTemplate()" class="text-blue-600 font-bold hover:underline">\u4e0b\u8f09\u6a19\u6e96\u7bc4\u672c (.xlsx)</button>
       </div>
+      <p class="mt-3 text-xs leading-5 text-slate-500">\u9078\u64c7\u6a94\u6848\u5f8c\u6703\u5148\u9032\u884c\u6a21\u64ec\u6aa2\u67e5\uff1b\u78ba\u8a8d\u524d\u4e0d\u6703\u5beb\u5165\u6216\u8b8a\u66f4\u4efb\u4f55\u8cc7\u6599\u3002</p>
     </div>
   </div>
   <!-- 3. \u532f\u5165\u6210\u7e3e Modal -->
@@ -1167,6 +1168,7 @@
         <div class="flex justify-end text-xs mb-3">
           <button onclick="App.downloadTestScoreTemplate()" class="text-indigo-600 font-bold hover:underline">\u4e0b\u8f09 17 \u6b04\u4f4d\u6a19\u6e96\u6210\u7e3e\u7bc4\u672c (.xlsx)</button>
         </div>
+        <p class="text-xs leading-5 text-slate-500">\u9078\u64c7\u6a94\u6848\u5f8c\u6703\u5148\u986f\u793a\u65b0\u589e\u3001\u66f4\u65b0\u3001\u8986\u5beb\u3001\u7565\u904e\u53ca\u7570\u5e38\u8cc7\u6599\uff1b\u78ba\u8a8d\u524d\u4e0d\u6703\u5beb\u5165\u3002</p>
         <!-- \u6b77\u53f2\u532f\u5165\u72c0\u614b\u5340\u584a -->
         <div class="pt-3 border-t border-slate-200">
           <h4 class="text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5">
@@ -1180,7 +1182,54 @@
       </div>
     </div>
   </div>
-  <!-- 4. \ud83d\udee1\ufe0f \u5b78\u7c4d\u6bd4\u5c0d\u9632\u5446\u63d0\u9192 Modal -->
+  <!-- 4. \u532f\u5165\u524d\u6a21\u64ec\u6aa2\u67e5 Modal\uff1a\u4efb\u4f55\u540d\u518a\u6216\u6210\u7e3e\u532f\u5165\u90fd\u5fc5\u9808\u5148\u7d93\u904e\u6b64\u756b\u9762\u3002 -->
+  <div id="importSimulationModal" class="fixed inset-0 z-[60] bg-slate-900/55 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 hidden">
+    <div class="corp-card max-w-5xl w-full bg-white rounded-2xl shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col overflow-hidden">
+      <div class="flex items-start justify-between gap-4 px-5 sm:px-6 py-4 border-b border-slate-200 bg-slate-50/70">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5-2.5A11 11 0 0112 3a11 11 0 01-8 4.5c0 5.3 3.4 10.1 8 11.5 4.6-1.4 8-6.2 8-11.5z"></path></svg>
+            </div>
+            <div class="min-w-0">
+              <h3 id="importSimulationTitle" class="text-lg font-black text-slate-900">\u532f\u5165\u524d\u6a21\u64ec\u6aa2\u67e5</h3>
+              <p id="importSimulationMeta" class="mt-0.5 truncate text-xs font-medium text-slate-500">\u6a94\u6848\u8cc7\u8a0a</p>
+            </div>
+          </div>
+        </div>
+        <button type="button" onclick="App.cancelImportSimulation()" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="\u53d6\u6d88\u532f\u5165">\u2715</button>
+      </div>
+      <div class="flex-1 overflow-y-auto px-5 sm:px-6 py-5 space-y-4">
+        <div id="importSimulationStatus" class="rounded-xl border px-4 py-3 text-sm font-bold"></div>
+        <div id="importSimulationStats" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5"></div>
+        <div id="importSimulationIssueWrap" class="rounded-xl border border-slate-200 overflow-hidden hidden">
+          <div class="flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
+            <div>
+              <h4 class="text-sm font-black text-slate-800">\u9700\u8981\u78ba\u8a8d\u7684\u8cc7\u6599</h4>
+              <p class="mt-0.5 text-[11px] text-slate-500">\u7d05\u8272\u4ee3\u8868\u53ef\u80fd\u5f71\u97ff\u8cc7\u6599\u6b63\u78ba\u6027\uff1b\u9ec3\u8272\u70ba\u63d0\u9192\u6216\u81ea\u52d5\u6821\u6b63\u3002</p>
+            </div>
+            <span id="importSimulationIssueFootnote" class="shrink-0 text-[11px] font-bold text-slate-500"></span>
+          </div>
+          <div class="max-h-72 overflow-auto">
+            <table class="w-full min-w-[720px] text-left">
+              <thead class="sticky top-0 bg-white text-[11px] font-bold text-slate-500 shadow-[0_1px_0_#e2e8f0]">
+                <tr><th class="w-16 px-3 py-2 text-center">\u5217\u6b21</th><th class="w-32 px-3 py-2">\u5b78\u865f</th><th class="w-36 px-3 py-2">\u985e\u578b</th><th class="px-3 py-2">\u8aaa\u660e</th></tr>
+              </thead>
+              <tbody id="importSimulationIssueBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-xs leading-5 text-blue-800">
+          \u76ee\u524d\u50c5\u5b8c\u6210\u89e3\u6790\u8207\u6a21\u64ec\uff0c\u7cfb\u7d71\u8cc7\u6599\u5c1a\u672a\u8b8a\u66f4\u3002\u6309\u4e0b\u78ba\u8a8d\u5f8c\u624d\u6703\u9032\u5165\u5f8c\u7e8c\u885d\u7a81\u8655\u7406\u6216\u6b63\u5f0f\u532f\u5165\u3002
+        </div>
+      </div>
+      <div class="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 px-5 sm:px-6 py-4 border-t border-slate-200 bg-white">
+        <button type="button" onclick="App.cancelImportSimulation()" class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-bold text-slate-700 hover:bg-slate-50">\u53d6\u6d88\uff0c\u4e0d\u532f\u5165</button>
+        <button id="importSimulationConfirmButton" type="button" onclick="App.confirmImportSimulation()" class="px-5 py-2.5 rounded-xl bg-blue-600 text-sm font-bold text-white shadow-sm hover:bg-blue-700">\u78ba\u8a8d\u4e26\u7e7c\u7e8c</button>
+      </div>
+    </div>
+  </div>
+  <!-- 5. \ud83d\udee1\ufe0f \u5b78\u7c4d\u6bd4\u5c0d\u9632\u5446\u63d0\u9192 Modal -->
   <div id="importMismatchModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 hidden">
     <div class="corp-card max-w-3xl w-full p-6 shadow-2xl bg-white rounded-2xl max-h-[90vh] flex flex-col border border-slate-200">
       <div class="flex items-center justify-between pb-3 border-b border-rose-200 mb-4">

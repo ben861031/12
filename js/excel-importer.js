@@ -53,7 +53,7 @@ window.FitnessImporter = {
       swappedNameMatches
     };
   },
-  async importRosterExcel(file) {
+  async scanRosterExcel(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -65,109 +65,209 @@ window.FitnessImporter = {
           if (!jsonRows || jsonRows.length === 0) {
             return reject('\u4e0a\u50b3\u7684 Excel \u6a94\u6848\u5167\u7121\u6709\u6548\u5b78\u751f\u6578\u64da');
           }
+          const allKeys = [...new Set(jsonRows.flatMap(row => Object.keys(row)))];
+          const compactKey = key => String(key || '').replace(/\s+/g, '');
+          const idKey = allKeys.find(k => compactKey(k).includes('\u5b78\u865f') || compactKey(k).toLowerCase().includes('id'));
+          const nameKey = allKeys.find(k => compactKey(k).includes('\u59d3\u540d') || compactKey(k).includes('\u540d\u5b57') || compactKey(k).toLowerCase().includes('name'));
+          const classKey = allKeys.find(k => compactKey(k).includes('\u73ed\u7d1a'));
+          const enrollYearKey = allKeys.find(k => compactKey(k).includes('\u5165\u5b78\u5e74'));
+          const admissionKey = allKeys.find(k => compactKey(k).includes('\u5165\u5b78\u65b9\u5f0f'));
+          const identityKey = allKeys.find(k => compactKey(k) === '\u8eab\u5206' || compactKey(k).includes('\u8eab\u4efd'));
+          const rosterStatusKey = allKeys.find(k => compactKey(k).includes('\u5b78\u7c4d\u72c0\u614b'));
+          if (!idKey || !nameKey || !classKey) {
+            return reject('\u7121\u6cd5\u8fa8\u8b58\u5fc5\u8981\u6b04\u4f4d\uff0c\u8acb\u78ba\u8a8d Excel \u6a19\u984c\u5217\u5305\u542b\u300c\u5b78\u865f\u3001\u59d3\u540d\u3001\u73ed\u7d1a\u300d');
+          }
           const existingStudents = window.FitnessStore.getStudents();
           const studentMap = new Map(existingStudents.map(s => [String(s.studentId).trim(), s]));
-          const uploadedStudentIds = new Set();
-          let addedCount = 0;
-          let updatedCount = 0;
-          jsonRows.forEach(row => {
-            const keys = Object.keys(row);
-            const idKey = keys.find(k => k.includes('\u5b78\u865f') || k.toLowerCase().includes('id'));
-            const nameKey = keys.find(k => k.includes('\u59d3\u540d') || k.includes('\u540d\u5b57') || k.toLowerCase().includes('name'));
-            const classKey = keys.find(k => k.includes('\u73ed\u7d1a'));
-            if (!idKey || !row[idKey]) return;
-            const studentId = String(row[idKey]).trim();
-            uploadedStudentIds.add(studentId);
-            const excelName = nameKey ? String(row[nameKey]).trim() : '\u672a\u547d\u540d';
-            const className = classKey ? String(row[classKey]).trim() : '\u672a\u8a2d\u5b9a';
-            const admissionMethod = row['\u5165\u5b78\u65b9\u5f0f'] ? String(row['\u5165\u5b78\u65b9\u5f0f']).trim() : '';
-            const identityStatus = row['\u8eab\u5206'] ? String(row['\u8eab\u5206']).trim() : '';
-            let tCredit = 0;
-            let eCredit = 0;
-            let isTrans = 0;
-            let isExempt = 0;
-            if (admissionMethod.includes('\u8f49\u5b78\u8003')) {
-               tCredit = 1;
-               isTrans = 1;
-            } else if (admissionMethod.includes('\u904b\u52d5\u7e3e\u512a')) {
-               eCredit = 2;
-               isExempt = 1;
+          let normalNameMatches = 0;
+          let swappedNameMatches = 0;
+          let comparableRows = 0;
+          jsonRows.slice(0, 300).forEach(row => {
+            const studentId = String(row[idKey] ?? '').trim();
+            const existing = studentMap.get(studentId);
+            if (!existing?.name) return;
+            comparableRows++;
+            if (this.isNameMatching(existing.name, String(row[nameKey] ?? '').trim())) normalNameMatches++;
+            if (this.isNameMatching(existing.name, String(row[classKey] ?? '').trim())) swappedNameMatches++;
+          });
+          const identityColumnsAutoCorrected = comparableRows >= 3
+            && swappedNameMatches >= 3
+            && swappedNameMatches >= normalNameMatches + 2
+            && swappedNameMatches / comparableRows >= 0.5;
+          const issues = [];
+          const itemMap = new Map();
+          let skippedCount = 0;
+          let duplicateCount = 0;
+          jsonRows.forEach((row, index) => {
+            const rowNum = index + 2;
+            const studentId = String(row[idKey] ?? '').trim();
+            if (!studentId) {
+              skippedCount++;
+              issues.push({ level: 'warning', type: '\u7f3a\u5c11\u5b78\u865f', rowNum, studentId: '', detail: '\u6b64\u5217\u4e0d\u6703\u532f\u5165' });
+              return;
             }
-            if (identityStatus.includes('\u8eab\u5fc3\u969c\u7919')) {
-               eCredit = 2;
-               isExempt = 1;
+            if (!/^\d{6,12}$/.test(studentId)) {
+              skippedCount++;
+              issues.push({ level: 'danger', type: '\u5b78\u865f\u683c\u5f0f\u7570\u5e38', rowNum, studentId, detail: '\u5b78\u865f\u9808\u70ba 6\u201312 \u4f4d\u6578\u5b57\uff0c\u6b64\u5217\u4e0d\u6703\u532f\u5165' });
+              return;
             }
-            if (studentMap.has(studentId)) {
-              const current = studentMap.get(studentId);
-              if (!this.isMaskedName(excelName)) {
-                current.name = excelName;
-              }
-              current.className = className || current.className;
-              current.rosterStatus = this.normalizeRosterStatus(
-                row['\u5b78\u7c4d\u72c0\u614b'],
-                this.normalizeRosterStatus(current.rosterStatus)
-              );
-              current.enrollYear = row['\u5165\u5b78\u5e74'] || current.enrollYear || window.FitnessStore.getEnrollYearFromStudentId(studentId);
-              current.admissionMethod = admissionMethod || current.admissionMethod || '';
-              current.identityStatus = identityStatus || current.identityStatus || '';
-              if (isTrans) { current.isTransfer = 1; current.transferCredit = 1; }
-              if (isExempt) { current.isExemptAthleteOrDisabled = 1; current.exemptCredit = 2; }
-              current.isRosterImported = true;
-              current.updatedAt = new Date().toLocaleDateString('zh-TW');
-              updatedCount++;
-            } else {
-              const newStudent = {
-                studentId: studentId,
-                name: excelName,
-                className: className,
-                enrollYear: row['\u5165\u5b78\u5e74'] || window.FitnessStore.getEnrollYearFromStudentId(studentId),
-                rosterStatus: this.normalizeRosterStatus(row['\u5b78\u7c4d\u72c0\u614b']),
-                admissionMethod: admissionMethod,
-                identityStatus: identityStatus,
-                isRosterImported: true,
-                department: '',
-                semesters: {
-                  "1101": 0, "1102": 0, "1111": 0, "1112": 0,
-                  "1121": 0, "1122": 0, "1131": 0, "1132": 0
-                },
-                status: '\u4e0d\u901a\u904e',
-                passCount: 0,
-                deficitCount: 2,
-                isTransfer: isTrans,
-                transferCredit: tCredit,
-                isExemptAthleteOrDisabled: isExempt,
-                exemptCredit: eCredit,
-                otherNotes: '',
-                reason: '',
-                updatedAt: new Date().toLocaleDateString('zh-TW')
-              };
-              studentMap.set(studentId, newStudent);
-              addedCount++;
+            const excelName = String(row[identityColumnsAutoCorrected ? classKey : nameKey] ?? '').trim() || '\u672a\u547d\u540d';
+            const className = String(row[identityColumnsAutoCorrected ? nameKey : classKey] ?? '').trim() || '\u672a\u8a2d\u5b9a';
+            const item = {
+              rowNum,
+              studentId,
+              excelName,
+              className,
+              enrollYear: String(enrollYearKey ? row[enrollYearKey] ?? '' : '').trim(),
+              rosterStatusRaw: String(rosterStatusKey ? row[rosterStatusKey] ?? '' : '').trim(),
+              admissionMethod: String(admissionKey ? row[admissionKey] ?? '' : '').trim(),
+              identityStatus: String(identityKey ? row[identityKey] ?? '' : '').trim()
+            };
+            if (itemMap.has(studentId)) {
+              duplicateCount++;
+              issues.push({ level: 'warning', type: '\u6a94\u6848\u5167\u91cd\u8907\u5b78\u865f', rowNum, studentId, detail: '\u5c07\u63a1\u7528\u6a94\u6848\u4e2d\u6700\u5f8c\u4e00\u5217\u8cc7\u6599' });
+            }
+            itemMap.set(studentId, item);
+            if (excelName === '\u672a\u547d\u540d') {
+              issues.push({ level: 'warning', type: '\u7f3a\u5c11\u59d3\u540d', rowNum, studentId, detail: '\u5c07\u4ee5\u300c\u672a\u547d\u540d\u300d\u532f\u5165' });
+            }
+            if (className === '\u672a\u8a2d\u5b9a') {
+              issues.push({ level: 'warning', type: '\u7f3a\u5c11\u73ed\u7d1a', rowNum, studentId, detail: '\u5c07\u4fdd\u7559\u65e2\u6709\u73ed\u7d1a\uff1b\u65b0\u751f\u5247\u70ba\u300c\u672a\u8a2d\u5b9a\u300d' });
+            }
+            const existing = studentMap.get(studentId);
+            if (existing && excelName !== '\u672a\u547d\u540d' && !this.isNameMatching(existing.name, excelName)) {
+              issues.push({
+                level: 'danger',
+                type: '\u59d3\u540d\u4e0d\u4e00\u81f4',
+                rowNum,
+                studentId,
+                detail: `\u7cfb\u7d71\u300c${existing.name || '\u672a\u547d\u540d'}\u300d\u2192 Excel\u300c${excelName}\u300d`
+              });
             }
           });
-          let archivedCount = 0;
-          for (const s of studentMap.values()) {
-            if (this.normalizeRosterStatus(s.rosterStatus) === '\u5728\u5b78' && !uploadedStudentIds.has(String(s.studentId))) {
-              s.rosterStatus = '\u975e\u5728\u5b78';
-              s.updatedAt = new Date().toLocaleDateString('zh-TW');
-              archivedCount++;
-            }
+          if (identityColumnsAutoCorrected) {
+            issues.unshift({
+              level: 'warning',
+              type: '\u59d3\u540d\uff0f\u73ed\u7d1a\u81ea\u52d5\u6821\u6b63',
+              rowNum: '-',
+              studentId: '',
+              detail: '\u4f9d\u65e2\u6709\u540d\u518a\u6bd4\u5c0d\u5f8c\u5224\u5b9a\u5169\u6b04\u5167\u5bb9\u4e92\u63db\uff0c\u6a21\u64ec\u8207\u532f\u5165\u5c07\u4f7f\u7528\u6821\u6b63\u5f8c\u6b04\u4f4d'
+            });
           }
-          const newStudentList = Array.from(studentMap.values());
-          window.FitnessStore.saveStudents(newStudentList);
-          window.FitnessStore.addAuditLog({
-            operator: window.FitnessStore.getCurrentOperatorName(),
-            action: '\u532f\u5165\u5b78\u7c4d\u8cc7\u6599',
-            details: `\u6210\u529f\u532f\u5165\u5b78\u7c4d\u6a94\uff1a\u65b0\u589e ${addedCount} \u4eba\uff0c\u66f4\u65b0 ${updatedCount} \u4eba\uff0c\u8f49\u70ba\u975e\u5728\u5b78 ${archivedCount} \u4eba`
+          const parsedItems = Array.from(itemMap.values());
+          if (parsedItems.length === 0) {
+            return reject('Excel \u4e2d\u6c92\u6709\u53ef\u532f\u5165\u7684\u6709\u6548\u5b78\u865f');
+          }
+          const uploadedStudentIds = new Set(parsedItems.map(item => item.studentId));
+          const addedCount = parsedItems.filter(item => !studentMap.has(item.studentId)).length;
+          const updatedCount = parsedItems.length - addedCount;
+          const archivedCount = existingStudents.filter(student => (
+            this.normalizeRosterStatus(student.rosterStatus) === '\u5728\u5b78'
+            && !uploadedStudentIds.has(String(student.studentId).trim())
+          )).length;
+          resolve({
+            kind: 'roster',
+            parsedItems,
+            totalRows: parsedItems.length,
+            simulation: {
+              sourceRows: jsonRows.length,
+              validRows: parsedItems.length,
+              addedCount,
+              updatedCount,
+              archivedCount,
+              skippedCount,
+              duplicateCount,
+              overwriteCount: 0,
+              issues,
+              identityColumnsAutoCorrected
+            }
           });
-          resolve({ addedCount, updatedCount, archivedCount, total: newStudentList.length });
         } catch (err) {
-          reject('Excel \u89e3\u6790\u5931\u6557\uff1a' + err.message);
+          reject('Excel \u6a21\u64ec\u6aa2\u67e5\u5931\u6557\uff1a' + err.message);
         }
       };
       reader.onerror = () => reject('\u6a94\u6848\u8b80\u53d6\u5931\u6557');
       reader.readAsBinaryString(file);
     });
+  },
+  applyRosterImport(scanResult, fileName = '') {
+    const existingStudents = window.FitnessStore.getStudents();
+    const studentMap = new Map(existingStudents.map(s => [String(s.studentId).trim(), s]));
+    const uploadedStudentIds = new Set(scanResult.parsedItems.map(item => item.studentId));
+    let addedCount = 0;
+    let updatedCount = 0;
+    scanResult.parsedItems.forEach(item => {
+      const admissionMethod = item.admissionMethod || '';
+      const identityStatus = item.identityStatus || '';
+      const isTrans = admissionMethod.includes('\u8f49\u5b78\u8003') ? 1 : 0;
+      const isExempt = admissionMethod.includes('\u904b\u52d5\u7e3e\u512a') || identityStatus.includes('\u8eab\u5fc3\u969c\u7919') ? 1 : 0;
+      if (studentMap.has(item.studentId)) {
+        const current = studentMap.get(item.studentId);
+        if (item.excelName !== '\u672a\u547d\u540d' && !this.isMaskedName(item.excelName)) current.name = item.excelName;
+        if (item.className !== '\u672a\u8a2d\u5b9a') current.className = item.className;
+        current.rosterStatus = this.normalizeRosterStatus(
+          item.rosterStatusRaw,
+          this.normalizeRosterStatus(current.rosterStatus)
+        );
+        current.enrollYear = item.enrollYear || current.enrollYear || window.FitnessStore.getEnrollYearFromStudentId(item.studentId);
+        current.admissionMethod = admissionMethod || current.admissionMethod || '';
+        current.identityStatus = identityStatus || current.identityStatus || '';
+        if (isTrans) { current.isTransfer = 1; current.transferCredit = 1; }
+        if (isExempt) { current.isExemptAthleteOrDisabled = 1; current.exemptCredit = 2; }
+        current.isRosterImported = true;
+        current.updatedAt = new Date().toLocaleDateString('zh-TW');
+        updatedCount++;
+      } else {
+        studentMap.set(item.studentId, {
+          studentId: item.studentId,
+          name: item.excelName,
+          className: item.className,
+          enrollYear: item.enrollYear || window.FitnessStore.getEnrollYearFromStudentId(item.studentId),
+          rosterStatus: this.normalizeRosterStatus(item.rosterStatusRaw),
+          admissionMethod,
+          identityStatus,
+          isRosterImported: true,
+          department: '',
+          semesters: {
+            "1101": 0, "1102": 0, "1111": 0, "1112": 0,
+            "1121": 0, "1122": 0, "1131": 0, "1132": 0
+          },
+          status: '\u4e0d\u901a\u904e',
+          passCount: 0,
+          deficitCount: 2,
+          isTransfer: isTrans,
+          transferCredit: isTrans ? 1 : 0,
+          isExemptAthleteOrDisabled: isExempt,
+          exemptCredit: isExempt ? 2 : 0,
+          otherNotes: '',
+          reason: '',
+          updatedAt: new Date().toLocaleDateString('zh-TW')
+        });
+        addedCount++;
+      }
+    });
+    let archivedCount = 0;
+    for (const student of studentMap.values()) {
+      if (this.normalizeRosterStatus(student.rosterStatus) === '\u5728\u5b78'
+        && !uploadedStudentIds.has(String(student.studentId).trim())) {
+        student.rosterStatus = '\u975e\u5728\u5b78';
+        student.updatedAt = new Date().toLocaleDateString('zh-TW');
+        archivedCount++;
+      }
+    }
+    const newStudentList = Array.from(studentMap.values());
+    window.FitnessStore.saveStudents(newStudentList);
+    window.FitnessStore.addAuditLog({
+      operator: window.FitnessStore.getCurrentOperatorName(),
+      action: '\u532f\u5165\u5b78\u751f\u540d\u518a',
+      studentId: 'MULTI',
+      details: `\u532f\u5165\u6a94\u6848\u300c${fileName || '\u672a\u547d\u540d\u6a94\u6848'}\u300d\uff1b\u65b0\u589e ${addedCount} \u4eba\u3001\u66f4\u65b0 ${updatedCount} \u4eba\u3001\u8f49\u70ba\u975e\u5728\u5b78 ${archivedCount} \u4eba`
+    });
+    return { addedCount, updatedCount, archivedCount, total: newStudentList.length };
+  },
+  async importRosterExcel(file) {
+    const scanResult = await this.scanRosterExcel(file);
+    return this.applyRosterImport(scanResult, file?.name || '');
   },
   async scanTestExcel(file, importSemester = '') {
     return new Promise((resolve, reject) => {
@@ -245,13 +345,45 @@ window.FitnessImporter = {
           const mismatches = [];
           const scoreConflicts = [];
           const logicConflicts = [];
+          const simulationIssues = [];
+          const seenStudentIds = new Set();
+          let skippedCount = 0;
+          let duplicateCount = 0;
           bodyRows.forEach((row, rowOffset) => {
             const values = row.map(v => String(v ?? '').trim());
             const studentId = values[idIdx];
             if (!studentId || studentId.includes('\u5b78\u865f') || studentId.includes('\u5408\u8a08')) return;
+            const rowNum = headerIndex + rowOffset + 2;
+            if (!/^\d{6,12}$/.test(studentId)) {
+              skippedCount++;
+              simulationIssues.push({
+                level: 'danger',
+                type: '\u5b78\u865f\u683c\u5f0f\u7570\u5e38',
+                rowNum,
+                studentId,
+                detail: '\u5b78\u865f\u9808\u70ba 6\u201312 \u4f4d\u6578\u5b57\uff0c\u6b64\u5217\u4e0d\u6703\u532f\u5165'
+              });
+              return;
+            }
+            if (seenStudentIds.has(studentId)) {
+              duplicateCount++;
+              simulationIssues.push({
+                level: 'warning',
+                type: '\u6a94\u6848\u5167\u91cd\u8907\u5b78\u865f',
+                rowNum,
+                studentId,
+                detail: '\u540c\u4e00\u5b78\u751f\u5728\u6a94\u6848\u4e2d\u51fa\u73fe\u591a\u6b21\uff0c\u5f8c\u5217\u8cc7\u6599\u53ef\u80fd\u8986\u84cb\u524d\u5217\u7d50\u679c'
+              });
+            }
+            seenStudentIds.add(studentId);
             const excelName = values[nameIdx] || '\u672a\u77e5\u59d3\u540d';
             const excelClass = values[classIdx] || '\u672a\u77e5\u73ed\u7d1a';
-            const rowNum = headerIndex + rowOffset + 2;
+            if (excelName === '\u672a\u77e5\u59d3\u540d') {
+              simulationIssues.push({ level: 'warning', type: '\u7f3a\u5c11\u59d3\u540d', rowNum, studentId, detail: '\u5c07\u4fdd\u7559\u65e2\u6709\u59d3\u540d\uff1b\u5168\u65b0\u5b78\u865f\u6703\u4ee5\u300c\u672a\u77e5\u59d3\u540d\u300d\u5efa\u7acb' });
+            }
+            if (excelClass === '\u672a\u77e5\u73ed\u7d1a') {
+              simulationIssues.push({ level: 'warning', type: '\u7f3a\u5c11\u73ed\u7d1a', rowNum, studentId, detail: '\u6210\u7e3e\u532f\u5165\u4e0d\u6703\u8986\u5beb\u540d\u518a\u73ed\u7d1a' });
+            }
             const existingStudent = studentMap.get(studentId);
             if (!existingStudent) {
               mismatches.push({
@@ -362,6 +494,52 @@ window.FitnessImporter = {
             }
             parsedItems.push(rowParsedData);
           });
+          const uniqueStudentIds = new Set(parsedItems.map(item => item.studentId));
+          const addedStudentCount = [...uniqueStudentIds].filter(studentId => !studentMap.has(studentId)).length;
+          const updatedStudentCount = uniqueStudentIds.size - addedStudentCount;
+          const affectedSemesters = importSemester
+            ? [importSemester]
+            : semesterIndices.map(item => item.semester);
+          let overwriteCount = 0;
+          let newRecordCount = 0;
+          if (importSemester && (semPassStatusIdx !== -1 || sitReachIdx !== -1)) {
+            uniqueStudentIds.forEach(studentId => {
+              if (recordMap.has(`${studentId}_${importSemester}`)) overwriteCount++;
+              else newRecordCount++;
+            });
+          }
+          if (identityColumns.autoCorrected) {
+            simulationIssues.unshift({
+              level: 'warning',
+              type: '\u59d3\u540d\uff0f\u73ed\u7d1a\u81ea\u52d5\u6821\u6b63',
+              rowNum: '-',
+              studentId: '',
+              detail: '\u4f9d\u65e2\u6709\u540d\u518a\u6bd4\u5c0d\u5f8c\u5224\u5b9a\u5169\u6b04\u5167\u5bb9\u4e92\u63db\uff0c\u6a21\u64ec\u8207\u532f\u5165\u5c07\u4f7f\u7528\u6821\u6b63\u5f8c\u6b04\u4f4d'
+            });
+          }
+          mismatches.forEach(item => simulationIssues.push({
+            level: item.type === 'NAME_MISMATCH' ? 'danger' : 'warning',
+            type: item.type === 'NAME_MISMATCH' ? '\u59d3\u540d\u4e0d\u4e00\u81f4' : '\u5168\u65b0\u5b78\u865f',
+            rowNum: item.rowNum,
+            studentId: item.studentId,
+            detail: item.type === 'NAME_MISMATCH'
+              ? `\u7cfb\u7d71\u300c${item.systemName}\u300d\u2192 Excel\u300c${item.excelName}\u300d`
+              : `\u5c07\u65b0\u589e\u300c${item.excelName}\u300d`
+          }));
+          scoreConflicts.forEach(item => simulationIssues.push({
+            level: 'danger',
+            type: '\u65e2\u6709\u6210\u7e3e\u885d\u7a81',
+            rowNum: item.rowNum,
+            studentId: item.studentId,
+            detail: `${item.semester}\uff1a\u7cfb\u7d71\u300c${item.dbStatus}\u300d\uff0fExcel\u300c${item.excelStatus}\u300d`
+          }));
+          logicConflicts.forEach(item => simulationIssues.push({
+            level: 'danger',
+            type: '\u9580\u6abb\u5224\u5b9a\u77db\u76fe',
+            rowNum: item.rowNum,
+            studentId: item.studentId,
+            detail: `\u5be6\u969b\u7d2f\u8a08 ${item.actualPasses} \u6b21\uff0cExcel \u6a19\u793a\u300c${item.excelStatus}\u300d`
+          }));
           resolve({
             parsedItems,
             mismatches,
@@ -370,7 +548,21 @@ window.FitnessImporter = {
             totalRows: parsedItems.length,
             isNew17ColumnFormat: semPassStatusIdx !== -1 || sitReachIdx !== -1,
             identityColumnsAutoCorrected: identityColumns.autoCorrected,
-            identityColumnDiagnostics: identityColumns
+            identityColumnDiagnostics: identityColumns,
+            simulation: {
+              sourceRows: bodyRows.length,
+              validRows: parsedItems.length,
+              addedCount: addedStudentCount,
+              updatedCount: updatedStudentCount,
+              archivedCount: 0,
+              overwriteCount,
+              newRecordCount,
+              skippedCount,
+              duplicateCount,
+              affectedSemesters,
+              issues: simulationIssues,
+              identityColumnsAutoCorrected: identityColumns.autoCorrected
+            }
           });
         } catch (err) {
           reject('Excel \u9632\u5446\u6bd4\u5c0d\u5931\u6557\uff1a' + err.message);
